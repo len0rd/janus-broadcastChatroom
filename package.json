@@ -1,0 +1,12 @@
+{
+    "name": "basic-fileserver",
+    "version": "0.0.1",
+    "description": "Base FS",
+    "scripts": {
+        "start": "node server-bare.js"
+    },
+    "dependencies": {
+        "fopen": "^1.0.0",
+        "node-static": "^0.7.10"
+    }
+}
