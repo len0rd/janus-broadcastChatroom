@@ -1236,6 +1236,11 @@ function Janus(gatewayCallbacks) {
 					Janus.log("Synchronous transaction successful (" + plugindata["plugin"] + ")");
 					var data = plugindata["data"];
 					Janus.debug(data);
+					if (data["videoroom"] === "created") {
+						json["janus"] = "event";
+						handleEvent(json, true);
+						return;
+					}
 					callbacks.success(data);
 					return;
 				} else if(json["janus"] !== "ack") {
