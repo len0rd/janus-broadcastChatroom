@@ -1224,7 +1224,7 @@ function Janus(gatewayCallbacks) {
 			body: request,
 			success: function(json) {
 				Janus.debug("Message sent!");
-				Janus.debug(json);
+				// Janus.debug(json);
 				if(json["janus"] === "success") {
 					// We got a success, must have been a synchronous transaction
 					var plugindata = json["plugindata"];
