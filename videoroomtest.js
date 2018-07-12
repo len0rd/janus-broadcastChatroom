@@ -127,8 +127,8 @@ $(document).ready(function() {
 							janusHandle.send({"message": register});
 						} else {
 							// Prepare the username registration
-							$('#videojoin').removeClass('hide').show();
-							$('#registernow').removeClass('hide').show();
+							$('#videojoin').removeClass('d-none').show();
+							//$('#registernow').removeClass('hide').show();
 							$('#register').click(registerUsername);
 							$('#username').focus();
 						}
@@ -318,7 +318,7 @@ $(document).ready(function() {
 						$('#videojoin').hide();
 
 						//show all the video containers
-						$('#videos').removeClass('hide').show();
+						$('#videos').removeClass('d-none').show();
 
 						// TODO: this is trash
 						//  I dont know why, but for non-host streams i can only get them
