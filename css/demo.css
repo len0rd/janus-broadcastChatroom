@@ -11,6 +11,14 @@
 	position: relative;
 }
 
+.page-header {
+	padding-bottom: 1.25rem;
+    margin-bottom: 2rem;
+	border-bottom: .05rem solid #eee;
+	padding-top: 1.25rem;
+    margin-top: 2rem;
+}
+
 .margin-sm {
 	margin: 5px !important;
 }
@@ -74,12 +82,4 @@ div.no-video-container {
 	right: 0px;
 	left: 0px;
 	font-size: 24px;
-}
-
-.meetecho-logo {
-	padding: 12px !important;
-}
-
-.meetecho-logo > img {
-	height: 26px;
 }
