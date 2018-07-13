@@ -127,8 +127,8 @@ $(document).ready(function() {
 							janusHandle.send({"message": register});
 						} else {
 							// Prepare the username registration
-							$('#videojoin').removeClass('hide').show();
-							$('#registernow').removeClass('hide').show();
+							$('#videojoin').removeClass('d-none').show();
+							//$('#registernow').removeClass('hide').show();
 							$('#register').click(registerUsername);
 							$('#username').focus();
 						}
@@ -163,7 +163,7 @@ $(document).ready(function() {
 						Janus.log("Janus says our WebRTC PeerConnection is " + (on ? "up" : "down") + " now");
 						$(LOCAL_VIDEO_ID).parent().parent().unblock();
 						// This controls allows us to override the global room bitrate cap
-						$('#bitrate').parent().parent().removeClass('hide').show();
+						$('#bitrate').parent().parent().removeClass('d-none').show();
 						$('#bitrate a').click(function() {
 							var id = $(this).attr("id");
 							var bitrate = parseInt(id)*1000;
@@ -318,23 +318,23 @@ $(document).ready(function() {
 						$('#videojoin').hide();
 
 						//show all the video containers
-						$('#videos').removeClass('hide').show();
+						$('#videos').removeClass('d-none').show();
 
 						// TODO: this is trash
 						//  I dont know why, but for non-host streams i can only get them
 						//  to work when i attach them to a video element as below
 						if ($('#video0').length === 0) {
-							$(LOCAL_VIDEO_ID).append('<video class="rounded centered" id="video0" width="100%" height="100%" autoplay muted="muted"/>');
+							$(LOCAL_VIDEO_ID).append('<video class="rounded centered d-none" id="video0" width="100%" height="100%" autoplay muted="muted"/>');
 						}
 
 						if (isHost) {
 							// if($('#video0').length === 0) {
 								// $(LOCAL_VIDEO_ID).append('<video class="rounded centered" id="video0" width="100%" height="100%" autoplay muted="muted"/>');
 								// Add a 'mute' button
-								$(LOCAL_VIDEO_ID).append('<button class="btn btn-warning btn-xs" id="mute" style="position: absolute; bottom: 0px; left: 0px; margin: 15px;">Mute</button>');
+								$(LOCAL_VIDEO_ID).append('<button class="btn btn-warning" id="mute" style="position: absolute; bottom: 0px; left: 0px; margin: 15px;">Mute</button>');
 								$('#mute').click(toggleMute);
 								// Add an 'unpublish' button
-								$(LOCAL_VIDEO_ID).append('<button class="btn btn-warning btn-xs" id="unpublish" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;">Unpublish</button>');
+								$(LOCAL_VIDEO_ID).append('<button class="btn btn-warning" id="unpublish" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;">Unpublish</button>');
 								$('#unpublish').click(unpublishOwnFeed);
 							// }
 							if (janusHandle.webrtcStuff.pc.iceConnectionState !== "completed" &&
@@ -348,26 +348,26 @@ $(document).ready(function() {
 									}
 								});
 							}
-
+							//still want the pretty username label up top tho
+							$(LOCAL_LABEL_ID).removeClass('d-none').html(myusername).show();
 						} else {
 							//add yourself to the participants list:
 							if ($('#rp' + myid).length === 0) {
 								
 								//if this stream isn't already on the list, add it
-								$('#clientlist').append('<li id="rp' + myid + '" class="list-group-item">' + myusername 
+								$('#clientlist').append('<li id="rp' + myid + '" class="list-group-item list-group-item-info">' + myusername 
 								+ ' <i class="abmuted fa fa-microphone-slash"></i></li>');
 								$('#rp' + myid + ' > i').hide();
 								//bind the mute button
-								$('#mute').removeClass('hide').show();
+								$('#mute').removeClass('d-none').show();
 								$('#mute').click(toggleMute);
 							}
 						}
 
+						Janus.debug("===1");
 						Janus.attachMediaStream($('#video0').get(0), stream);
 						// $(LOCAL_VIDEO_ID).get(0).muted = "muted";
-						Janus.debug("===1");
-						//still want the pretty username label up top tho
-						$(LOCAL_LABEL_ID).removeClass('hide').html(myusername).show();
+						
 						
 						Janus.debug("===2");
 						
@@ -387,7 +387,7 @@ $(document).ready(function() {
 							// }
 						} else {
 							// $(LOCAL_VIDEO_ID + ' .no-video-container').remove();
-							$('#video0').removeClass('hide').show();
+							$('#video0').removeClass('d-none').show();
 						}
 						Janus.debug("===4");
 					},
@@ -400,7 +400,7 @@ $(document).ready(function() {
 						$(LOCAL_VIDEO_ID).html('<button id="publish" class="btn btn-primary">Publish</button>');
 						$(LOCAL_LABEL_ID).click(function() { publishOwnFeed(true); });
 						$(LOCAL_VIDEO_ID).parent().parent().unblock();
-						$('#bitrate').parent().parent().addClass('hide');
+						$('#bitrate').parent().parent().addClass('d-none');
 						$('#bitrate a').unbind('click');
 					}
 				});
@@ -569,7 +569,7 @@ function newRemoteFeed(id, display, audio, video) {
 							remoteFeed.spinner.spin();
 						}
 						Janus.log("Successfully attached to feed " + remoteFeed.rfid + " (" + remoteFeed.rfdisplay + ") in room " + msg["room"]);
-						$('#videolabel' + remoteFeed.rfindex).removeClass('hide').html(remoteFeed.rfdisplay).show();
+						$('#videolabel' + remoteFeed.rfindex).removeClass('d-none').html(remoteFeed.rfdisplay).show();
 						feeds[0] = remoteFeed;
 					} else {
 						//if its not the host stream, find the first available
@@ -622,12 +622,12 @@ function newRemoteFeed(id, display, audio, video) {
 			if ($('#remotevideo'+remoteFeed.rfindex).length === 0) {
 				// No remote video yet
 				$('#videocontainer' + containerNum).append('<video class="rounded centered" id="waitingvideo' + remoteFeed.rfindex + '" width=320 height=240 />');
-				$('#videocontainer' + containerNum).append('<video class="rounded centered relative hide" id="remotevideo' + remoteFeed.rfindex + '" width="100%" height="100%" autoplay/>');
+				$('#videocontainer' + containerNum).append('<video class="rounded centered relative d-none" id="remotevideo' + remoteFeed.rfindex + '" width="100%" height="100%" autoplay/>');
 				
 				if (containerNum === 0) {
 					$('#videocontainer' + containerNum).append(
 						// '<span class="label label-primary hide" id="curres'+remoteFeed.rfindex+'" style="position: absolute; bottom: 0px; left: 0px; margin: 15px;"></span>' +
-						'<span class="label label-info hide" id="curbitrate'+remoteFeed.rfindex+'" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;"></span>');
+						'<span class="label label-info d-none" id="curbitrate'+remoteFeed.rfindex+'" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;"></span>');
 				}
 				// Show the video, hide the spinner and show the resolution when we get a playing event
 				$("#remotevideo" + remoteFeed.rfindex).bind("playing", function () {
@@ -687,7 +687,7 @@ function newRemoteFeed(id, display, audio, video) {
 				}
 			} else {
 				$('#videocontainer'+remoteFeed.rfindex+ ' .no-video-container').remove();
-				$('#remotevideo'+remoteFeed.rfindex).removeClass('hide').show();
+				$('#remotevideo'+remoteFeed.rfindex).removeClass('d-none').show();
 			}
 
 			if (!addButtons)
@@ -695,31 +695,35 @@ function newRemoteFeed(id, display, audio, video) {
 			//bitrate time junk:
 			if (remoteFeed.rfdisplay === HOST_USERNAME && (Janus.webRTCAdapter.browserDetails.browser === "chrome" 
 				|| Janus.webRTCAdapter.browserDetails.browser === "firefox" || Janus.webRTCAdapter.browserDetails.browser === "safari")) {
-				$('#curbitrate'+remoteFeed.rfindex).removeClass('hide').show();
+				$('#curbitrate'+remoteFeed.rfindex).removeClass('d-none').show();
 				bitrateTimer[remoteFeed.rfindex] = setInterval(function() {
 					// Display updated bitrate, if supported
 					var bitrate = remoteFeed.getBitrate();
 					$('#curbitrate'+remoteFeed.rfindex).text(bitrate);
 					// Check if the resolution changed too
-					var width = $("#remotevideo"+remoteFeed.rfindex).get(0).videoWidth;
-					var height = $("#remotevideo"+remoteFeed.rfindex).get(0).videoHeight;
-					if(width > 0 && height > 0)
-						$('#curres'+remoteFeed.rfindex).removeClass('hide').text(width+'x'+height).show();
+					// var width = $("#remotevideo"+remoteFeed.rfindex).get(0).videoWidth;
+					// var height = $("#remotevideo"+remoteFeed.rfindex).get(0).videoHeight;
+					// if(width > 0 && height > 0)
+					// 	$('#curres'+remoteFeed.rfindex).removeClass('hide').text(width+'x'+height).show();
 				}, 1000);
 			}
 		},
 		oncleanup: function() {
 			Janus.log(" ::: Got a cleanup notification (remote feed " + id + ") :::");
+			
 			if (remoteFeed.rfindex === 0) {
+				//if it's the host feed:
 				if(remoteFeed.spinner !== undefined && remoteFeed.spinner !== null)
 					remoteFeed.spinner.stop();
 				remoteFeed.spinner = null;
-				$('#remotevideo' + remoteFeed.rfindex).remove();
-				$('#waitingvideo' + remoteFeed.rfindex).remove();
 				$('#novideo'+remoteFeed.rfindex).remove();
 				$('#curbitrate'+remoteFeed.rfindex).remove();
-				$('#curres'+remoteFeed.rfindex).remove();
+			} else {
+				$('#rp' + remoteFeed.rfid).remove();
 			}
+			$('#remotevideo' + remoteFeed.rfindex).remove();
+			$('#waitingvideo' + remoteFeed.rfindex).remove();
+			
 
 			if(bitrateTimer[remoteFeed.rfindex] !== null && bitrateTimer[remoteFeed.rfindex] !== null) 
 				clearInterval(bitrateTimer[remoteFeed.rfindex]);
