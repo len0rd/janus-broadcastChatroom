@@ -22,8 +22,3 @@ echo "${ENDPOINT}"
 ROOM_ID=$(echo $ENDPOINT | awk '{print $19}')
 ROOM=${ROOM_ID::-1}
 echo "Room ID:" $ROOM
-
-# Join the room we just created:
-PAYLOAD='{"janus": "message", "transaction": "veryDifferentRandomString", "body": {"room": '"${PLUGIN_ID}"', "request": "join", "ptype": "publisher", "display": "displayName"}}'
-JOIN_RESPONSE="$(curl --header "Content-Type: application/json" --request POST --data ''"${PAYLOAD}"'' https://$IP:$PORT/janus/$SESSION_ID/$PLUGIN_ID -k --insecure)"
-echo "JOIN RESPONSE:: " $JOIN_RESPONSE
