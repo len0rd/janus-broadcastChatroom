@@ -149,5 +149,49 @@ URL: `https://localhost:8089/janus/sessionEndpointInteger/pluginHandleEndpointIn
 }
 ```
 
+If successful, Janus will return something like this:
+```json
+{
+   "janus": "success",
+   "session_id": sessionEndpointInteger,
+   "transaction": "moreDifferentRandomString",
+   "sender": pluginEndpointInteger,
+   "plugindata": {
+      "plugin": "janus.plugin.videoroom",
+      "data": {
+         "videoroom": "created",
+         "room": 5555,
+         "permanent": false
+      }
+   }
+}
+```
+
 Note: All the JSON fields following Publishers are optional. For more info, consult the documentation on the [videoroom plugin](https://janus.conf.meetecho.com/docs/videoroom.html).
 
+4. Join a videoroom
+
+Similar to creation, joining a room requires a POST through the plugin handle endpoint:
+
+URL: `https://localhost:8089/janus/sessionEndpointInteger/pluginHandleEndpointInteger`
+```json
+{
+    "janus": "message",
+    "transaction": "veryDifferentRandomString",
+    "body": {
+        "room": roomInteger,
+        "request": "join",
+        "ptype": "publisher",
+        "display" "displayName"
+    }
+}
+```
+
+**TODO::**
+Not sure how we get response here.. its sent as an event -> not an immediate response to the request.. I think?? I got an ACK from the server with the above join POST.
+
+5. Keep the session alive
+
+If you aren't actively sending POST requests, you need to send a long-poll request at least every 30 seconds. This is a simple GET request to tell Janus to you're still there, and to send any events to you if there are some waiting:
+
+URL: `https://localhost:8089/janus/sessionEndpointInteger?maxev=1`
