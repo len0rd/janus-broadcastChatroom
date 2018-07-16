@@ -30,12 +30,17 @@ cd libsrtp-2.0.0
 make shared_library && sudo make install
 ```
 
+4. Install npm(?)
+```bash
+sudo apt-get install nodejs npm
+```
+
 3. Install Janus
 ```bash
 git clone https://github.com/meetecho/janus-gateway.git
 cd janus-gateway
 sh autogen.sh
-./configure --prefix=/opt/janus --disable-all-plugins --enable-javascript-es-module --enable-plugin-videoroom --disable-unix-sockets --disable-websockets
+./configure --prefix=/opt/janus --disable-all-plugins --enable-javascript-es-module --enable-plugin-videoroom --disable-unix-sockets --disable-sample-event-handler
 sudo su
 make
 exit
@@ -43,7 +48,10 @@ exit
 
 install certs in the certs folder
 
-4. Install our config files for Janus (TODO)
+4. Install our config files for Janus
+```bash
+sudo cp conf/*.cfg /opt/janus/etc/janus
+```
 
 5. install in opt:
 ```bash
