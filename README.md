@@ -195,3 +195,11 @@ Not sure how we get response here.. its sent as an event -> not an immediate res
 If you aren't actively sending POST requests, you need to send a long-poll request at least every 30 seconds. This is a simple GET request to tell Janus to you're still there, and to send any events to you if there are some waiting:
 
 URL: `https://localhost:8089/janus/sessionEndpointInteger?maxev=1`
+
+
+# Streaming Commands
+
+rtsp stream:
+```bash
+raspivid -n -w 1280 -h 720 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| ffmpeg -y -i - -c:v copy -map 0:0 -f rtsp rtsp://10.10.110.103:8554/myStream
+```
