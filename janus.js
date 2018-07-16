@@ -82,6 +82,7 @@ var defaultExtension = {
 	}
 };
 
+// TYLER- SETS UP HTTPAPI request method
 Janus.useDefaultDependencies = function (deps) {
 	var f = (deps && deps.fetch) || fetch;
 	var p = (deps && deps.Promise) || Promise;
@@ -317,7 +318,7 @@ Janus.init = function(options) {
 		// Detect tab close: make sure we don't loose existing onbeforeunload handlers
 		var oldOBF = window.onbeforeunload;
 		window.onbeforeunload = function() {
-			Janus.log("Closing window");
+			Janus.log("-===Closing window===");
 			for(var s in Janus.sessions) {
 				if(Janus.sessions[s] !== null && Janus.sessions[s] !== undefined &&
 						Janus.sessions[s].destroyOnUnload) {

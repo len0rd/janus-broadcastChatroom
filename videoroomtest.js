@@ -1,53 +1,13 @@
 // We make use of this 'server' variable to provide the address of the
 // REST Janus API. By default, in this example we assume that Janus is
 // co-located with the web server hosting the HTML pages but listening
-// on a different port (8088, the default for HTTP in Janus), which is
-// why we make use of the 'window.location.hostname' base address. Since
-// Janus can also do HTTPS, and considering we don't really want to make
-// use of HTTP for Janus if your demos are served on HTTPS, we also rely
-// on the 'window.location.protocol' prefix to build the variable, in
-// particular to also change the port used to contact Janus (8088 for
-// HTTP and 8089 for HTTPS, if enabled).
-// In case you place Janus behind an Apache frontend (as we did on the
-// online demos at http://janus.conf.meetecho.com) you can just use a
-// relative path for the variable, e.g.:
-//
-// 		var server = "/janus";
-//
-// which will take care of this on its own.
-//
-//
-// If you want to use the WebSockets frontend to Janus, instead, you'll
-// have to pass a different kind of address, e.g.:
-//
-// 		var server = "ws://" + window.location.hostname + ":8188";
-//
-// Of course this assumes that support for WebSockets has been built in
-// when compiling the gateway. WebSockets support has not been tested
-// as much as the REST API, so handle with care!
-//
-//
-// If you have multiple options available, and want to let the library
-// autodetect the best way to contact your gateway (or pool of gateways),
-// you can also pass an array of servers, e.g., to provide alternative
-// means of access (e.g., try WebSockets first and, if that fails, fall
-// back to plain HTTP) or just have failover servers:
-//
-//		var server = [
-//			"ws://" + window.location.hostname + ":8188",
-//			"/janus"
-//		];
-//
-// This will tell the library to try connecting to each of the servers
-// in the presented order. The first working server will be used for
-// the whole session.
-//
+// on a different port (8089)
+
+//TODO: Eventually this code will be client/participant only -> will need
+//to weed most of the host code (clients will still need to recognize)
+//when a remote feed is 
 const HOST_USERNAME = "cfe331345cb7443aaf92";
-var server = null;
-if(window.location.protocol === 'http:')
-	server = "http://" + window.location.hostname + ":8088/janus";
-else
-	server = "https://" + window.location.hostname + ":8089/janus";
+var server = "https://" + window.location.hostname + ":8089/janus";
 
 var isHost = (getQueryStringValue("c") === "1" || getQueryStringValue("c") === "y");
 var room   = Number(getQueryStringValue("r"));
@@ -70,6 +30,7 @@ var feeds = [];
 var bitrateTimer = [];
 
 window.onbeforeunload = function(event) {
+	// janus.destroy(); // potential issue if janus not initialized
 	if (janusHandle !== null && isHost) {
 		//try and send a destroy request... good luck getting it through in time
 		var destroy = {"request": "destroy", "room": room};
@@ -210,59 +171,62 @@ $(document).ready(function() {
 									window.location.reload();
 								});
 							} else if (event === "event") {
-								// Any new feed to attach to?
-								if(msg["publishers"] !== undefined && msg["publishers"] !== null) {
-									var list = msg["publishers"];
-									Janus.debug("Got a list of available publishers/feeds:");
-									Janus.debug(list);
-									for(var f in list) {
-										var id = list[f]["id"];
-										var display = list[f]["display"];
-										var audio = list[f]["audio_codec"];
-										var video = list[f]["video_codec"];
-										Janus.debug("  >> [" + id + "] " + display + " (audio: " + audio + ", video: " + video + ")");
-										newRemoteFeed(id, display, audio, video);
-									}
-								} else if(msg["leaving"] !== undefined && msg["leaving"] !== null) {
-									// One of the publishers has gone away?
-									var leaving = msg["leaving"];
-									Janus.log("Publisher left: " + leaving);
-									var remoteFeed = null;
-									for(var i=1; i<6; i++) {
-										if(feeds[i] != null && feeds[i] != undefined && feeds[i].rfid == leaving) {
-											remoteFeed = feeds[i];
-											break;
+								//remote feed subscription management.
+								// if we're host we dont care about this stuff:
+								if (!isHost) {
+									if(msg["publishers"] !== undefined && msg["publishers"] !== null) {
+										var list = msg["publishers"];
+										Janus.debug("Got a list of available publishers/feeds:");
+										Janus.debug(list);
+										for(var f in list) {
+											var id = list[f]["id"];
+											var display = list[f]["display"];
+											var audio = list[f]["audio_codec"];
+											var video = list[f]["video_codec"];
+											Janus.debug("  >> [" + id + "] " + display + " (audio: " + audio + ", video: " + video + ")");
+											newRemoteFeed(id, display, audio, video);
 										}
-									}
-									if(remoteFeed != null) {
-										Janus.debug("Feed " + remoteFeed.rfid + " (" + remoteFeed.rfdisplay + ") has left the room, detaching");
-										$('#videolabel'+remoteFeed.rfindex).empty().hide();
-										$('#videocontainer'+remoteFeed.rfindex).empty();
-										feeds[remoteFeed.rfindex] = null;
-										remoteFeed.detach();
-									}
-								} else if(msg["unpublished"] !== undefined && msg["unpublished"] !== null) {
-									// One of the publishers has unpublished?
-									var unpublished = msg["unpublished"];
-									Janus.log("Publisher left: " + unpublished);
-									if(unpublished === 'ok') {
-										// That's us
-										janusHandle.hangup();
-										return;
-									}
-									var remoteFeed = null;
-									for(var i=1; i<6; i++) {
-										if(feeds[i] != null && feeds[i] != undefined && feeds[i].rfid == unpublished) {
-											remoteFeed = feeds[i];
-											break;
+									} else if(msg["leaving"] !== undefined && msg["leaving"] !== null) {
+										// One of the publishers has gone away?
+										var leaving = msg["leaving"];
+										Janus.log("Publisher left: " + leaving);
+										var remoteFeed = null;
+										for(var i=1; i<6; i++) {
+											if(feeds[i] != null && feeds[i] != undefined && feeds[i].rfid == leaving) {
+												remoteFeed = feeds[i];
+												break;
+											}
 										}
-									}
-									if(remoteFeed != null) {
-										Janus.debug("Feed " + remoteFeed.rfid + " (" + remoteFeed.rfdisplay + ") has left the room, detaching");
-										$('#videolabel'+remoteFeed.rfindex).empty().hide();
-										$('#videocontainer'+remoteFeed.rfindex).empty();
-										feeds[remoteFeed.rfindex] = null;
-										remoteFeed.detach();
+										if(remoteFeed != null) {
+											Janus.debug("Feed " + remoteFeed.rfid + " (" + remoteFeed.rfdisplay + ") has left the room, detaching");
+											$('#videolabel'+remoteFeed.rfindex).empty().hide();
+											$('#videocontainer'+remoteFeed.rfindex).empty();
+											feeds[remoteFeed.rfindex] = null;
+											remoteFeed.detach();
+										}
+									} else if(msg["unpublished"] !== undefined && msg["unpublished"] !== null) {
+										// One of the publishers has unpublished?
+										var unpublished = msg["unpublished"];
+										Janus.log("Publisher left: " + unpublished);
+										if(unpublished === 'ok') {
+											// That's us
+											janusHandle.hangup();
+											return;
+										}
+										var remoteFeed = null;
+										for(var i=1; i<6; i++) {
+											if(feeds[i] != null && feeds[i] != undefined && feeds[i].rfid == unpublished) {
+												remoteFeed = feeds[i];
+												break;
+											}
+										}
+										if(remoteFeed != null) {
+											Janus.debug("Feed " + remoteFeed.rfid + " (" + remoteFeed.rfdisplay + ") has left the room, detaching");
+											$('#videolabel'+remoteFeed.rfindex).empty().hide();
+											$('#videocontainer'+remoteFeed.rfindex).empty();
+											feeds[remoteFeed.rfindex] = null;
+											remoteFeed.detach();
+										}
 									}
 								} else if(msg["error"] !== undefined && msg["error"] !== null) {
 									if(msg["error_code"] === 426) {
@@ -412,11 +376,6 @@ $(document).ready(function() {
 				});
 			},
 			destroyed: function() {
-				// if (isHost) {
-				// 	Janus.debug("===SENDING DESTROY REQUEST===");
-				// 	var destroy = {"request": "destroy", "room": room};
-				// 	janusHandle.send({"message": destroy});
-				// }
 				window.location.reload();
 			}
 		});
@@ -627,7 +586,7 @@ function newRemoteFeed(id, display, audio, video) {
 				if (containerNum === 0) {
 					$('#videocontainer' + containerNum).append(
 						// '<span class="label label-primary hide" id="curres'+remoteFeed.rfindex+'" style="position: absolute; bottom: 0px; left: 0px; margin: 15px;"></span>' +
-						'<span class="label label-info d-none" id="curbitrate'+remoteFeed.rfindex+'" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;"></span>');
+						'<span class="badge badge-pill badge-secondary d-none" id="curbitrate'+remoteFeed.rfindex+'" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;"></span>');
 				}
 				// Show the video, hide the spinner and show the resolution when we get a playing event
 				$("#remotevideo" + remoteFeed.rfindex).bind("playing", function () {
@@ -635,21 +594,6 @@ function newRemoteFeed(id, display, audio, video) {
 						remoteFeed.spinner.stop();
 					remoteFeed.spinner = null;
 					$('#waitingvideo'+remoteFeed.rfindex).remove();
-
-					/*stuff to show the current video resolution (do we really care about this?? not for final product)
-					if(this.videoWidth)
-						$('#remotevideo'+remoteFeed.rfindex).removeClass('hide').show();
-					var width = this.videoWidth;
-					var height = this.videoHeight;
-					$('#curres'+remoteFeed.rfindex).removeClass('hide').text(width+'x'+height).show();
-					if(Janus.webRTCAdapter.browserDetails.browser === "firefox") {
-						// Firefox Stable has a bug: width and height are not immediately available after a playing
-						setTimeout(function() {
-							var width = $("#remotevideo"+remoteFeed.rfindex).get(0).videoWidth;
-							var height = $("#remotevideo"+remoteFeed.rfindex).get(0).videoHeight;
-							$('#curres'+remoteFeed.rfindex).removeClass('hide').text(width+'x'+height).show();
-						}, 2000);
-					}*/
 				});
 			}
 
@@ -700,11 +644,6 @@ function newRemoteFeed(id, display, audio, video) {
 					// Display updated bitrate, if supported
 					var bitrate = remoteFeed.getBitrate();
 					$('#curbitrate'+remoteFeed.rfindex).text(bitrate);
-					// Check if the resolution changed too
-					// var width = $("#remotevideo"+remoteFeed.rfindex).get(0).videoWidth;
-					// var height = $("#remotevideo"+remoteFeed.rfindex).get(0).videoHeight;
-					// if(width > 0 && height > 0)
-					// 	$('#curres'+remoteFeed.rfindex).removeClass('hide').text(width+'x'+height).show();
 				}, 1000);
 			}
 		},
@@ -724,7 +663,6 @@ function newRemoteFeed(id, display, audio, video) {
 			$('#remotevideo' + remoteFeed.rfindex).remove();
 			$('#waitingvideo' + remoteFeed.rfindex).remove();
 			
-
 			if(bitrateTimer[remoteFeed.rfindex] !== null && bitrateTimer[remoteFeed.rfindex] !== null) 
 				clearInterval(bitrateTimer[remoteFeed.rfindex]);
 			bitrateTimer[remoteFeed.rfindex] = null;
