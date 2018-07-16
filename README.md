@@ -50,6 +50,10 @@ exit
 ```bash
 sudo cp conf/mycert.* /opt/janus/share/janus/certs
 ```
+Or, generate your own self-signed certs:
+```bash
+openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout mycert.key -out mycert.pem
+```
 
 7. Install our config files for Janus
 ```bash
@@ -70,7 +74,8 @@ Below is the basic structure of how to start a video room with Janus gateway
 
 1. Create session with the Gateway
 
-Send a post request to create the session:
+Send a POST request to create the session:
+
 URL: `https://localhost:8089/janus`
 ```json
 {
@@ -91,11 +96,12 @@ In CURL:
 ```bash
 curl --header "Content-Type: application/json" -k --insecure --request POST --data '{ "janus": "create", "transaction": "randomString"}' https://localhost:8089/janus
 ```
-Note: the `-k --insecure` parameters allow self-signed certificates to be used by CURL. This is useful in a development environment, but should be removed in any production scenario.
+**Note:** the `-k --insecure` parameters allow self-signed certificates to be used by CURL. This is useful in a development environment, but should be removed in any production scenario.
 
 2. Attach to the videoroom plugin handle
 
-Send a post request to attach the session to the plugin handle:
+Send a POST request to attach the session to the plugin handle:
+
 URL: `https://localhost:8089/janus/sessionEndpointInteger`
 ```json
 {
@@ -121,4 +127,27 @@ In CURL:
 curl --header "Content-Type: application/json" -k --insecure --request POST --data '{ "janus": "attach", "plugin": "janus.plugin.videoroom", "transaction": "differentRandomString", "opaque_id" : "user123"}' https://localhost:8089/janus/sessionEndpointInteger
 ```
 
+3. [Optional] Create a new room in the videoroom plugin
+
+Send a POST request to create a new broadcast room:
+
+URL: `https://localhost:8089/janus/sessionEndpointInteger/pluginHandleEndpointInteger`
+```json
+{
+    "janus": "message",
+    "transaction": "moreDifferentRandomString",
+    "body": {
+        "room": roomInteger,
+        "request": "create",
+        "publishers": 10,
+
+        "record": false,
+        "is_private": true,
+        "fir_freq": 10,
+        "bitrate": 128000
+    }
+}
+```
+
+Note: All the JSON fields following Publishers are optional. For more info, consult the documentation on the [videoroom plugin](https://janus.conf.meetecho.com/docs/videoroom.html).
 
