@@ -18,6 +18,7 @@ const LOCAL_LABEL_ID = isHost ? '#videolabel0' : '#videolabel1';
 
 var janus = null;
 var janusHandle = null;
+var streamingHandle = null;
 var opaqueId = "videoroomtest-" + Janus.randomString(12);
 
 var myusername = null;
@@ -53,7 +54,7 @@ $(document).ready(function() {
 		janus = new Janus({
 			server: server,
 			success: function() {
-				// Attach to video room test plugin
+				// Attach to video room plugin
 				janus.attach({
 					plugin: "janus.plugin.videoroom",
 					opaqueId: opaqueId,
@@ -95,7 +96,7 @@ $(document).ready(function() {
 						}
 					},
 					error: function(error) {
-						Janus.error("  -- Error attaching plugin...", error);
+						Janus.error("  -- Error attaching videoroom plugin...", error);
 						bootbox.alert("Error attaching plugin... " + error);
 					},
 					consentDialog: function(on) {
@@ -150,6 +151,11 @@ $(document).ready(function() {
 								mypvtid = msg["private_id"];
 								Janus.log("Successfully joined room " + msg["room"] + " with ID " + myid);
 								publishOwnFeed(true);
+
+								if (streamingHandle !== null) {
+									//if we have a streaming handle, connect to the default stream for the room;
+									connectRoomStream();
+								}
 								// Any new feed to attach to? --> Remote feeds only (not local)
 								if(msg["publishers"] !== undefined && msg["publishers"] !== null) {
 									var list = msg["publishers"];
@@ -366,6 +372,107 @@ $(document).ready(function() {
 						$(LOCAL_VIDEO_ID).parent().parent().unblock();
 						$('#bitrate').parent().parent().addClass('d-none');
 						$('#bitrate a').unbind('click');
+					}
+				});
+
+				// Attach to streaming plugin
+				janus.attach({
+					plugin: "janus.plugin.streaming",
+					opaqueId: opaqueId,
+					success: function(pluginHandle) {
+						Janus.log("Steam plugin attached!");
+						streamingHandle = pluginHandle;
+					},
+					error: function(error) {
+						Janus.error(" ==> ERROR attaching streaming plugin", error);
+						bootbox.alert("Error streaming video: " + error);
+					},
+					onmessage: function(msg, jsep) {
+						Janus.debug(" ==> Streaming Handle got a message");
+						Janus.debug(msg);
+						var result = msg["result"];
+						if (result !== null && result !== undefined) {
+							// you can get a bunch of info about status here.
+							// see the streamingtest example for details
+						} else if (msg["error"] !== null && msg["error"] !== undefined) {
+							bootbox.alert(msg["error"]);
+							Janus.log(" ==> Streaming got error message: ", msg);
+							return;
+						}
+
+						if(jsep !== undefined && jsep !== null) {
+							Janus.debug("Handling SDP as well...");
+							Janus.debug(jsep);
+							// Offer from the plugin, let's answer
+							streaming.createAnswer({
+								jsep: jsep,
+								media: { audioSend: false, videoSend: false },	// We want recvonly audio/video
+								success: function(jsep) {
+									Janus.debug("Got SDP!");
+									Janus.debug(jsep);
+									var body = { "request": "start" };
+									streaming.send({"message": body, "jsep": jsep});
+									$('#watch').html("Stop").removeAttr('disabled').click(stopStream);
+								},
+								error: function(error) {
+									Janus.error("WebRTC error:", error);
+									bootbox.alert("WebRTC error... " + JSON.stringify(error));
+								}
+							});
+						}
+					},
+					onremotestream: function(stream) {
+						// We got the non-webrtc remote stream!
+						if ($('#remotevideo0').length === 0) {
+							//if the video tag hasn't been made yet, create it
+							$('#videocontainer0').append('<video class="rounded centered relative d-none" id="remotevideo0" width="100%" height="100%" autoplay/>');
+							// and the little badge for bitrate
+							$('#videocontainer0').append(
+								'<span class="badge badge-pill badge-secondary d-none" id="curbitrate0" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;"></span>');
+						}
+
+						Janus.attachMediaStream($('#remotevideo0').get(0), stream);
+						var videoTracks = stream.getVideoTracks();
+						if (videoTracks === null || videoTracks === undefined || videoTracks.length === 0) {
+							// No remote video
+							//if this is the host stream and it has no video
+							//display a nice little icon indicating this
+							$('#remotevideo0').hide();
+							if($('#videocontainer0' + ' .no-video-container').length === 0) {
+								$('#videocontainer0').append(
+									'<div class="no-video-container">' +
+										'<i class="fa fa-video-camera fa-5 no-video-icon"></i>' +
+										'<span class="no-video-text">No remote video available</span>' +
+									'</div>');
+							}
+						} else {
+							//we got a video track:
+							$('#videocontainer0 .no-video-container').remove();
+							$('#remotevideo0').removeClass('d-none').show();
+						}
+
+						//bitrate time junk:
+						if (videoTracks && videoTracks.length && (
+							Janus.webRTCAdapter.browserDetails.browser === "chrome" 
+							|| Janus.webRTCAdapter.browserDetails.browser === "firefox" 
+							|| Janus.webRTCAdapter.browserDetails.browser === "safari")) {
+							
+								$('#curbitrate0').removeClass('d-none').show();
+								bitrateTimer[0] = setInterval(function() {
+								// Display updated bitrate, if supported
+								var bitrate = streamingHandle.getBitrate();
+								$('#curbitrate0').text(bitrate);
+							}, 1000);
+						}
+						
+					},
+					oncleanup: function() {
+						Janus.log("cleanup notification for remote streaming video");
+						
+						$('#remotevideo0').remove();
+						if (bitrateTimer[0] !== null && bitrateTimer[0] !== undefined) {
+							clearInterval(bitrateTimer[0]);
+						}
 					}
 				});
 			},
@@ -601,7 +708,7 @@ function newRemoteFeed(id, display, audio, video) {
 			//setup video if this is the host feed
 			if (remoteFeed.rfdisplay === HOST_USERNAME) {
 				Janus.debug("==This is the remote host stream to attach");
-				//it's the host stream, add to the main pane
+				//it's the host stream, add to the main panewe got the
 				addButtons = true;
 			} else {
 				//if it's a normal audio-only participant, just add it to the list:
@@ -663,11 +770,21 @@ function newRemoteFeed(id, display, audio, video) {
 			$('#remotevideo' + remoteFeed.rfindex).remove();
 			$('#waitingvideo' + remoteFeed.rfindex).remove();
 			
-			if(bitrateTimer[remoteFeed.rfindex] !== null && bitrateTimer[remoteFeed.rfindex] !== null) 
+			if(bitrateTimer[remoteFeed.rfindex] !== null && bitrateTimer[remoteFeed.rfindex] !== undefined) 
 				clearInterval(bitrateTimer[remoteFeed.rfindex]);
 			bitrateTimer[remoteFeed.rfindex] = null;
 		}
 	});
+}
+
+/**
+ * Helper method
+ * Connects to the default stream for the room
+ */
+function connectRoomStream() {
+	// Request to watch the default stream for the room.
+	var request = {"request": "watch", "id": room};
+	streaming.send({"message": request});
 }
 
 // Helper to parse query string
