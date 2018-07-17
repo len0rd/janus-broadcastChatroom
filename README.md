@@ -2,21 +2,21 @@ Create a broadcast chat room using Janus and NodeJS.
 
 ## Table of Contents
 
-|-[Dependencies](#dependencies)
+[Dependencies](#dependencies)
 
-|-|-[Install Node/NPM](#install-node-and-npm)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Install Node/NPM](#install-node-and-npm)
 
-|-|-[Setup Fileserver](#setup-the-fileserver)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Setup Fileserver](#setup-the-fileserver)
 
-|-|-[Install Janus](#install-janus)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Install Janus](#install-janus)
 
-|-[Run the Demo](#run-the-demo)
+[Run the Demo](#run-the-demo)
 
-|-[Developers](#developers)
+[Developers](#developers)
 
-|-|-[Communicate with Janus](#communicate-with-janus)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Communicate with Janus](#communicate-with-janus)
 
-|-|-[Linux Streaming Commands](#streaming-commands-wip)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Linux Streaming Commands](#streaming-commands-wip)
 
 # Dependencies
 
@@ -25,7 +25,9 @@ To install and run this demo, you will need to satisfy the folowing dependencies
 **NOTE:** Janus is currently only supported on Linux environments.
 
 [Janus](https://github.com/meetecho/janus-gateway)
+
 [NodeJS](https://nodejs.org/en/)
+
 [Npm](https://www.npmjs.com/get-npm)
 
 Below is a guide on how to install these dependencies.
