@@ -43,7 +43,7 @@ $(document).ready(function() {
 	// Initialize the library (all console debuggers enabled)
 	Janus.init({debug: "all", callback: function(){
 		// Use a button to start the demo
-		//$('#start').one('click', function() {
+		//$('#stop').one('click', function() {
 		$(this).attr('disabled', true).unbind('click');
 		// Make sure the browser supports WebRTC
 		if(!Janus.isWebrtcSupported()) {
@@ -63,7 +63,7 @@ $(document).ready(function() {
 						janusHandle = pluginHandle;
 						Janus.log("Plugin attached! (" + janusHandle.getPlugin() + ", id=" + janusHandle.getId() + ")");
 						Janus.log("  -- This is a publisher/manager");
-						$('#start').removeAttr('disabled').click(function() {
+						$('#stop').click(function() {
 							$(this).attr('disabled', true);
 							if (isHost) {
 								Janus.debug("===SENDING DESTROY REQUEST===");
@@ -177,6 +177,18 @@ $(document).ready(function() {
 									window.location.reload();
 								});
 							} else if (event === "event") {
+								//see if this is an error event
+								if(msg["error"] !== undefined && msg["error"] !== null) {
+									if(msg["error_code"] === 426) {
+										// This is a "no such room" error: give a more meaningful description
+										bootbox.alert(
+											"Room <code>" + room + "</code> does not exist");
+									} else {
+										bootbox.alert(msg["error"]);
+									}
+									return;
+								}
+
 								//remote feed subscription management.
 								// if we're host we dont care about this stuff:
 								if (!isHost) {
@@ -234,19 +246,11 @@ $(document).ready(function() {
 											remoteFeed.detach();
 										}
 									}
-								} else if(msg["error"] !== undefined && msg["error"] !== null) {
-									if(msg["error_code"] === 426) {
-										// This is a "no such room" error: give a more meaningful description
-										bootbox.alert(
-											"Room <code>" + room + "</code> does not exist");
-									} else {
-										bootbox.alert(msg["error"]);
-									}
-								}
+								} 
 							} else if (event === "created") {
 								Janus.debug("room created! username will indicate we're host");
 								room = msg["room"];
-								$('#start').html("Close Room");
+								$('#stop').html("Close Room");
 								$('#h1Title').html("Room #" + room);
 								myusername = HOST_USERNAME;
 								username = HOST_USERNAME;
@@ -289,6 +293,7 @@ $(document).ready(function() {
 
 						//show all the video containers
 						$('#videos').removeClass('d-none').show();
+						$('#stop').removeClass('d-none').show();
 
 						// TODO: this is trash
 						//  I dont know why, but for non-host streams i can only get them
