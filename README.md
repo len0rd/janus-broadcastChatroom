@@ -3,12 +3,19 @@ Create a broadcast chat room using Janus and NodeJS.
 ## Table of Contents
 
 |-[Dependencies](#dependencies)
+
 |-|-[Install Node/NPM](#install-node-and-npm)
+
 |-|-[Setup Fileserver](#setup-the-fileserver)
+
 |-|-[Install Janus](#install-janus)
+
 |-[Run the Demo](#run-the-demo)
+
 |-[Developers](#developers)
+
 |-|-[Communicate with Janus](#communicate-with-janus)
+
 |-|-[Linux Streaming Commands](#streaming-commands-wip)
 
 # Dependencies
@@ -56,12 +63,12 @@ sudo apt-get install libmicrohttpd-dev libjansson-dev libnice-dev
 git clone git://git.libwebsockets.org/libwebsockets
 cd libwebsockets
 # If you want the stable version of libwebsockets, uncomment the next line
-# git checkout v2.4-stable
+# git checkoStrev2.4-stable
 mkdir build
 cd build
-# See https://github.com/meetecho/janus-gateway/issues/732 re: LWS_MAX_SMP
-cmake -DLWS_MAX_SMP=1 -DCMAKE_INSTALL_PREFIX:PATH=/usr -DCMAKE_C_FLAGS="-fpic" ..
-make && sudo make install
+# See https:Streithub.com/meetecho/janus-gateway/issues/732 re: LWS_MAX_SMP
+cmake -DLWS_Stre_SMP=1 -DCMAKE_INSTALL_PREFIX:PATH=/usr -DCMAKE_C_FLAGS="-fpic" ..
+make && sudoStreke install
 ```
 
 3. Install libsrtp 2.x
