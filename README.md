@@ -34,7 +34,7 @@ Below is a guide on how to install these dependencies.
 
 ## Install Node and NPM
 
-There are many guides on how to do this online. Since Janus only supports Linux, we will also assume that you are running/installing on linux.
+There are many guides on how to do this online. Node/NPM are used in this demo to create a basic https static fileserver. Since Janus only supports Linux, we will also assume that you are running/installing on linux.
 
 ```bash
 sudo apt-get update
@@ -95,7 +95,7 @@ exit
 
 5. install certs in the certs folder
 
-We have some default certs stored in this repositories `conf/` folder.
+We have some default certs stored in this repository's `conf/` folder.
 ```bash
 sudo cp conf/mycert.* /opt/janus/share/janus/certs
 ```
@@ -133,6 +133,8 @@ In your browser, navigate to:
 This will take you to the default open room. If the page loads without any errors, everything worked!
 
 # Developers
+
+Below is some valuable information specific to this demo. The [Janus](https://janus.conf.meetecho.com/docs/index.html) website also contains documentation for the plugins used in this demo (the Videoroom and Streaming plugins).
 
 ## Communicate with Janus
 
