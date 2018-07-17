@@ -6,8 +6,8 @@ var https = require('https');
 
 const HTTPS_PORT = 8080;
 const serverConfig = {
-  key:  fs.readFileSync('key.pem'),
-  cert: fs.readFileSync('cert.pem'),
+  key:  fs.readFileSync('conf/mycert.key'),
+  cert: fs.readFileSync('conf/mycert.pem'),
 };
 
 var fileServer = new(nodeStatic.Server)();
