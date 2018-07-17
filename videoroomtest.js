@@ -404,14 +404,14 @@ $(document).ready(function() {
 							Janus.debug("Handling SDP as well...");
 							Janus.debug(jsep);
 							// Offer from the plugin, let's answer
-							streaming.createAnswer({
+							streamingHandle.createAnswer({
 								jsep: jsep,
 								media: { audioSend: false, videoSend: false },	// We want recvonly audio/video
 								success: function(jsep) {
 									Janus.debug("Got SDP!");
 									Janus.debug(jsep);
 									var body = { "request": "start" };
-									streaming.send({"message": body, "jsep": jsep});
+									streamingHandle.send({"message": body, "jsep": jsep});
 									$('#watch').html("Stop").removeAttr('disabled').click(stopStream);
 								},
 								error: function(error) {
@@ -784,7 +784,7 @@ function newRemoteFeed(id, display, audio, video) {
 function connectRoomStream() {
 	// Request to watch the default stream for the room.
 	var request = {"request": "watch", "id": room};
-	streaming.send({"message": request});
+	streamingHandle.send({"message": request});
 }
 
 // Helper to parse query string
