@@ -1,4 +1,47 @@
-# Janus install
+Create a broadcast chat room using Janus and NodeJS.
+
+## Table of Contents
+
+|-[Dependencies](#dependencies)
+|-|-[Install Node/NPM](#install-node-and-npm)
+|-|-[Setup Fileserver](#setup-the-fileserver)
+|-|-[Install Janus](#install-janus)
+|-[Run the Demo](#run-the-demo)
+|-[Developers](#developers)
+|-|-[Communicate with Janus](#communicate-with-janus)
+|-|-[Linux Streaming Commands](#streaming-commands-wip)
+
+# Dependencies
+
+To install and run this demo, you will need to satisfy the folowing dependencies:
+
+**NOTE:** Janus is currently only supported on Linux environments.
+
+[Janus](https://github.com/meetecho/janus-gateway)
+[NodeJS](https://nodejs.org/en/)
+[Npm](https://www.npmjs.com/get-npm)
+
+Below is a guide on how to install these dependencies.
+
+## Install Node and NPM
+
+There are many guides on how to do this online. Since Janus only supports Linux, we will also assume that you are running/installing on linux.
+
+```bash
+sudo apt-get update
+sudo apt-get install nodejs npm
+```
+
+## Setup the fileserver
+
+We'll need some files in this repository later for the Janus Install
+
+```bash
+git clone https://github.com/len0rd/janus-multiroom.git
+npm install
+```
+
+## Install Janus
 
 1. Install base dependencies
 ```bash
@@ -30,12 +73,7 @@ cd libsrtp-2.0.0
 make shared_library && sudo make install
 ```
 
-4. Install npm(?)
-```bash
-sudo apt-get install nodejs npm
-```
-
-5. Install Janus
+4. Install Janus
 ```bash
 git clone https://github.com/meetecho/janus-gateway.git
 cd janus-gateway
@@ -46,7 +84,9 @@ make
 exit
 ```
 
-6. install certs in the certs folder
+5. install certs in the certs folder
+
+We have some default certs stored in this repositories `conf/` folder.
 ```bash
 sudo cp conf/mycert.* /opt/janus/share/janus/certs
 ```
@@ -54,22 +94,39 @@ Or, generate your own self-signed certs:
 ```bash
 openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout mycert.key -out mycert.pem
 ```
+*Janus documentation recommends avoiding 512 bit certs for now*
 
-7. Install our config files for Janus
+6. Install our config files for Janus
+
+These config files are in the `conf/` folder of this repository.
 ```bash
 sudo cp conf/*.cfg /opt/janus/etc/janus
 ```
 
-8. install in opt:
+7. install in opt:
 ```bash
 make install
 ```
 
+# Run the demo
 
-avoid 512bit certs
+With everything setup, you're ready to run the demo.
 
+Start Janus and the fileserver:
+```bash
+./opt/janus/bin/janus
+cd this/repositorys/directory
+npm start
+```
 
-# Communicate with Janus
+In your browser, navigate to:
+`https://localhost:8080?r=1234`
+This will take you to the default open room. If the page loads without any errors, everything worked!
+
+# Developers
+
+## Communicate with Janus
+
 Below is the basic structure of how to start a video room with Janus gateway
 
 1. Create session with the Gateway
@@ -101,12 +158,12 @@ curl --header "Content-Type: application/json" -k --insecure --request POST --da
 2. Attach to the videoroom plugin handle
 
 Send a POST request to attach the session to the plugin handle:
-
-URL: `https://localhost:8089/janus/sessionEndpointInteger`
-```json
-{
-	"janus": "attach",
-	"plugin": "janus.plugin.videoroom",
+project
+URL: `https://localhost:8089/januprojects/sessionEndpointInteger`
+```jsonproject
+{project
+	"janus": "attach",project
+	"plugin": "janus.plugin.videoprojectroom",
 	"transaction": "differentRandomString",
 	"opaque_id" : "optional identifier for user"
 }
@@ -233,7 +290,7 @@ If you aren't actively sending POST requests, you need to send a long-poll reque
 URL: `https://localhost:8089/janus/sessionEndpointInteger?maxev=1`
 
 
-# Streaming Commands
+## Streaming Commands-WIP
 
 rtsp stream:
 ```bash

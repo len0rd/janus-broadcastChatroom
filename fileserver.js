@@ -1,5 +1,7 @@
 'use strict';
-
+/**
+ * Barebones https fileserver to use with Janus Gateway
+ */
 var fs = require('fs');
 var nodeStatic = require('node-static');
 var https = require('https');
