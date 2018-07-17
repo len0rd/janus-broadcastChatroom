@@ -169,26 +169,62 @@ If successful, Janus will return something like this:
 
 Note: All the JSON fields following Publishers are optional. For more info, consult the documentation on the [videoroom plugin](https://janus.conf.meetecho.com/docs/videoroom.html).
 
-4. Join a videoroom
+4. Create a mountpoint for the stream
 
-Similar to creation, joining a room requires a POST through the plugin handle endpoint:
+If you are streaming from a non-WebRTC device (eg: a linux computer without a Firefox or Chrome browser), you need to create a mountpoint for the stream. This is done with Janus' Streaming plugin. Similar to the video room, you first need to attach the plugin to your Jaus Gateway session:
 
-URL: `https://localhost:8089/janus/sessionEndpointInteger/pluginHandleEndpointInteger`
+URL: `https://localhost:8089/janus/sessionEndpointInteger`
+```json
+{
+	"janus": "attach",
+	"plugin": "janus.plugin.streaming",
+	"transaction": "differentRandomString",
+	"opaque_id" : "optional identifier for user"
+}
+```
+
+This should return a new plugin handle endpoint:
+
+```json
+{
+   "janus": "success",
+   "session_id": sessionEndpointInteger,
+   "transaction": "differentRandomString",
+   "data": {
+      "id": streamingPluginHandleEndpointInteger
+   }
+}
+```
+
+Now you can create the mountpoint using your new streaming plugin endpoint:
+
+URL: `https://localhost:8089/janus/sessionEndpointInteger/streamingPluginHandleEndpointInteger`
 ```json
 {
     "janus": "message",
-    "transaction": "veryDifferentRandomString",
+    "transaction": "mostDifferentRandomString",
     "body": {
-        "room": roomInteger,
-        "request": "join",
-        "ptype": "publisher",
-        "display" "displayName"
+        "request": "create",
+        "is_private": false,
+        "id": ID,
+        "type": "rtp",
+        "audio": false,
+        "video": true,
+        "videoport": 8004,
+        "videopt": 126,
+        "videortpmap": "H264/90000",
+        "videofmtp": "profile-level-id=42e01f"
     }
 }
 ```
 
-**TODO::**
-Not sure how we get response here.. its sent as an event -> not an immediate response to the request.. I think?? I got an ACK from the server with the above join POST.
+In this example we create a video-only H264 RTP stream. However, Janus supports many other encodings and streaming formats.
+
+In CURL:
+```bash
+curl --header "Content-Type: application/json" --request POST --data '{"janus" : "attach", "plugin" : "janus.plugin.streaming", "transaction" : "differentRandomString"}' https://localhost:8089/janus/sessionEndpointInteger -k --insecure
+curl --header "Content-Type: application/json" --request POST --data '{"janus": "message", "transaction": "123abc", "body": {"request": "create", "is_private": true, "id": ID, "type": "rtp", "audio": false, "video": true, "videoport": 8004, "videopt": 126, "videortpmap": "H264/90000", "videofmtp": "profile-level-id=42e01f"}}' -k --insecure
+```
 
 5. Keep the session alive
 
