@@ -139,7 +139,7 @@ $(document).ready(function() {
 								var forwarderList = msg["rtp_forwarders"];
 								if (forwarderList === null || forwarderList === undefined ||
 									forwarderList.length === 0) {
-									Janus.debug(" ==> Setup room forwarding now");
+									Janus.warn(" ==> Setup room forwarding now");
 									// we haven't forwarded the audiobridge
 									// to the controller yet. Do that now
 									//TODO: make this a little less terrible
@@ -147,8 +147,7 @@ $(document).ready(function() {
 										"request": "rtp_forward",
 										"room": room,
 										"host": streamOrigin,
-										"port": 8007,
-										"always_on": true};
+										"port": 8007};
 									audioHandle.send({"message": forwardAudio});
 								} else {
 									Janus.warn(" ==> Room forwarding already exists");

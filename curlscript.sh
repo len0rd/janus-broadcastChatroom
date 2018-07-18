@@ -10,13 +10,13 @@ echo "${GATEWAY}"
 SESSION_ID=$(echo $GATEWAY | awk '{print $9}')
 echo "Session ID:" $SESSION_ID
 
-PLUGIN="$(curl --header "Content-Type: application/json" --request POST --data '{"janus" : "attach", "plugin" : "janus.plugin.videoroom", "transaction" : "123abc"}' https://$IP:$PORT/janus/$SESSION_ID -k --insecure)"
+PLUGIN="$(curl --header "Content-Type: application/json" --request POST --data '{"janus" : "attach", "plugin" : "janus.plugin.audiobridge", "transaction" : "123abc"}' https://$IP:$PORT/janus/$SESSION_ID -k --insecure)"
 echo "${PLUGIN}"
 
 PLUGIN_ID=$(echo $PLUGIN | awk '{print $11}')
 echo "Plugin Handle ID:" $PLUGIN_ID
 
-ENDPOINT="$(curl --header "Content-Type: application/json" --request POST --data '{"janus": "message", "transaction": "123abc", "body": { "room": 4545, "request": "create", "publishers": 10, "record": false, "is_private": true, "fir_freq": 10, "bitrate": 128000}}' https://$IP:$PORT/janus/$SESSION_ID/$PLUGIN_ID -k --insecure)"
+ENDPOINT="$(curl --header "Content-Type: application/json" --request POST --data '{"janus": "message", "transaction": "123abc", "body": { "room": 4545, "request": "create", "record": false, "is_private": true}}' https://$IP:$PORT/janus/$SESSION_ID/$PLUGIN_ID -k --insecure)"
 echo "${ENDPOINT}"
 
 ROOM_ID=$(echo $ENDPOINT | awk '{print $19}')
