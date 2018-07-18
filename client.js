@@ -7,6 +7,7 @@
 //to weed most of the host code (clients will still need to recognize)
 //when a remote feed is 
 var server = "https://" + window.location.hostname + ":8089/janus";
+var streamOrigin = "10.10.110.74";
 
 const room   = Number(getQueryStringValue("r"));
 var janus = null;
@@ -60,6 +61,11 @@ $(document).ready(function() {
 							$(this).attr('disabled', true);
 							janus.destroy();
 						});
+
+						//see if the audio rtp forwarder to the controller has been created:
+						var checkForwarders = {"request": "listforwarders", "room": room};
+						
+						audioHandle.send({"message": checkForwarders});
 					},
 					error: function(error) {
 						Janus.error("Error attaching audiobridge plugin...", error);
@@ -129,6 +135,24 @@ $(document).ready(function() {
 								bootbox.alert("The room has been destroyed", function() {
 									window.location.reload();
 								});
+							} else if (event === "forwarders") {
+								var forwarderList = msg["rtp_forwarders"];
+								if (forwarderList === null || forwarderList === undefined ||
+									forwarderList.length === 0) {
+									Janus.debug(" ==> Setup room forwarding now");
+									// we haven't forwarded the audiobridge
+									// to the controller yet. Do that now
+									//TODO: make this a little less terrible
+									var forwardAudio = {
+										"request": "rtp_forward",
+										"room": room,
+										"host": streamOrigin,
+										"port": 8007,
+										"always_on": true};
+									audioHandle.send({"message": forwardAudio});
+								} else {
+									Janus.warn(" ==> Room forwarding already exists");
+								}
 							} else if (event === "event") {
 								if (msg["participants"] !== undefined && msg["participants"] !== null) {
 									var list = msg["participants"];
@@ -209,6 +233,7 @@ $(document).ready(function() {
 					success: function(pluginHandle) {
 						Janus.log("Steam plugin attached!");
 						streamingHandle = pluginHandle;
+						
 					},
 					error: function(error) {
 						Janus.error(" ==> ERROR attaching streaming plugin", error);
@@ -239,7 +264,7 @@ $(document).ready(function() {
 									Janus.debug(jsep);
 									var body = { "request": "start" };
 									streamingHandle.send({"message": body, "jsep": jsep});
-									$('#watch').html("Stop").removeAttr('disabled').click(stopStream);
+									$('#remotevideo0').html("Stop").removeAttr('disabled').click(stopStream);
 								},
 								error: function(error) {
 									Janus.error("WebRTC error:", error);
@@ -402,18 +427,14 @@ function registerUsername() {
 		var username = $('#username').val();
 		//failure condition
 		if(username === "") {
-			$('#you')
-				.removeClass().addClass('label label-warning')
-				.html("Insert your display name (e.g., HomeOwner, Police, EMS)");
+			//TODO: need error handling here
 			$('#username').removeAttr('disabled');
 			$('#register').removeAttr('disabled').click(registerUsername);
 			return;
 		}
 		//failure condition
 		if(/[^a-zA-Z0-9]/.test(username)) {
-			$('#you')
-				.removeClass().addClass('label label-warning')
-				.html('Input is not alphanumeric');
+			//TODO: need error handling here
 			$('#username').removeAttr('disabled').val("");
 			$('#register').removeAttr('disabled').click(registerUsername);
 			return;
