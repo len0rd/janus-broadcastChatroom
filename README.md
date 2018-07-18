@@ -43,7 +43,7 @@ sudo apt-get install nodejs npm
 
 ## Setup the fileserver
 
-We'll need some files in this repository later for the Janus Install
+We'll need some of the files in this repository later for the Janus Install
 
 ```bash
 git clone https://github.com/len0rd/janus-multiroom.git
@@ -87,7 +87,7 @@ make shared_library && sudo make install
 git clone https://github.com/meetecho/janus-gateway.git
 cd janus-gateway
 sh autogen.sh
-./configure --prefix=/opt/janus --disable-all-plugins --enable-javascript-es-module --enable-plugin-videoroom --disable-unix-sockets --disable-sample-event-handler --enable-plugin-streaming
+./configure --prefix=/opt/janus --disable-all-plugins --enable-javascript-es-module --enable-plugin-audiobridge --disable-unix-sockets --disable-sample-event-handler --enable-plugin-streaming
 sudo su
 make
 exit
@@ -166,15 +166,15 @@ curl --header "Content-Type: application/json" -k --insecure --request POST --da
 ```
 **Note:** the `-k --insecure` parameters allow self-signed certificates to be used by CURL. This is useful in a development environment, but should be removed in any production scenario.
 
-2. Attach to the videoroom plugin handle
+2. Attach to the audiobridge plugin
 
 Send a POST request to attach the session to the plugin handle:
-project
-URL: `https://localhost:8089/januprojects/sessionEndpointInteger`
-```jsonproject
-{project
-	"janus": "attach",project
-	"plugin": "janus.plugin.videoprojectroom",
+
+URL: `https://localhost:8089/janus/sessionEndpointInteger`
+```json
+{
+	"janus": "attach",
+	"plugin": "janus.plugin.audiobridge",
 	"transaction": "differentRandomString",
 	"opaque_id" : "optional identifier for user"
 }
@@ -192,7 +192,7 @@ If successful, Janus will return something like this:
 ```
 In CURL:
 ```bash
-curl --header "Content-Type: application/json" -k --insecure --request POST --data '{ "janus": "attach", "plugin": "janus.plugin.videoroom", "transaction": "differentRandomString", "opaque_id" : "user123"}' https://localhost:8089/janus/sessionEndpointInteger
+curl --header "Content-Type: application/json" -k --insecure --request POST --data '{ "janus": "attach", "plugin": "janus.plugin.audiobridge", "transaction": "differentRandomString", "opaque_id" : "optional identifier for user"}' https://localhost:8089/janus/sessionEndpointInteger
 ```
 
 3. [Optional] Create a new room in the videoroom plugin
@@ -217,6 +217,8 @@ URL: `https://localhost:8089/janus/sessionEndpointInteger/pluginHandleEndpointIn
 }
 ```
 
+Note: Janus will automatically choose a roomInteger if you do not provide one.
+
 If successful, Janus will return something like this:
 ```json
 {
@@ -225,7 +227,7 @@ If successful, Janus will return something like this:
    "transaction": "moreDifferentRandomString",
    "sender": pluginEndpointInteger,
    "plugindata": {
-      "plugin": "janus.plugin.videoroom",
+      "plugin": "janus.plugin.audiobridge",
       "data": {
          "videoroom": "created",
          "room": 5555,
@@ -235,7 +237,7 @@ If successful, Janus will return something like this:
 }
 ```
 
-Note: All the JSON fields following Publishers are optional. For more info, consult the documentation on the [videoroom plugin](https://janus.conf.meetecho.com/docs/videoroom.html).
+For more info, consult the documentation on the [audio bridge plugin](https://janus.conf.meetecho.com/docs/audiobridge.html).
 
 4. Create a mountpoint for the stream
 
