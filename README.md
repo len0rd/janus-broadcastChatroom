@@ -43,7 +43,7 @@ sudo apt-get install nodejs npm
 
 ## Setup the fileserver
 
-We'll need some files in this repository later for the Janus Install
+We'll need some of the files in this repository later for the Janus Install
 
 ```bash
 git clone https://github.com/len0rd/janus-multiroom.git
