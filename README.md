@@ -87,7 +87,7 @@ make shared_library && sudo make install
 git clone https://github.com/meetecho/janus-gateway.git
 cd janus-gateway
 sh autogen.sh
-./configure --prefix=/opt/janus --disable-all-plugins --enable-javascript-es-module --enable-plugin-videoroom --disable-unix-sockets --disable-sample-event-handler --enable-plugin-streaming
+./configure --prefix=/opt/janus --disable-all-plugins --enable-javascript-es-module --enable-plugin-audiobridge --disable-unix-sockets --disable-sample-event-handler --enable-plugin-streaming
 sudo su
 make
 exit

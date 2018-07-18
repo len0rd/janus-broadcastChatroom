@@ -17,7 +17,7 @@ const LOCAL_VIDEO_ID = isHost ? '#videocontainer0' : '#videocontainer1';
 const LOCAL_LABEL_ID = isHost ? '#videolabel0' : '#videolabel1';
 
 var janus = null;
-var janusHandle = null;
+var audioHandle = null;
 var streamingHandle = null;
 var opaqueId = "videoroomtest-" + Janus.randomString(12);
 
@@ -462,6 +462,25 @@ $(document).ready(function() {
 	}});
 });
 
+/**
+ * Helper method
+ * Connects to the default stream for the room
+ * The stream is a non-WebRTC stream published by something
+ */
+function connectRoomStream() {
+	// Request to watch the default stream for the room.
+	var request = {"request": "watch", "id": room};
+	streamingHandle.send({"message": request});
+}
+
+// Helper to parse query string
+function getQueryStringValue(name) {
+	name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+	var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+		results = regex.exec(location.search);
+	return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+}
+
 function checkEnter(field, event) {
 	var theCode = event.keyCode ? event.keyCode : event.which ? event.which : event.charCode;
 	if (theCode == 13) {
@@ -500,271 +519,8 @@ function registerUsername() {
 			$('#register').removeAttr('disabled').click(registerUsername);
 			return;
 		}
-		var register = { "request": "join", "room": room, "ptype": "publisher", "display": username };
+		var register = {"request": "join", "room": myroom, "display": username};
 		myusername = username;
-		janusHandle.send({"message": register});
+		audioHandle.send({"message": register});
 	}
-}
-
-function publishOwnFeed(useAudio) {
-	// Publish our stream
-	if (isHost) {
-		$(LOCAL_LABEL_ID).attr('disabled', true).unbind('click');
-	}
-	Janus.debug('===CREATE OFFER===');
-	janusHandle.createOffer({
-		// Add data:true here if you want to publish datachannels as well
-		media: { audioRecv: false, videoRecv: false, audioSend: true, videoSend: isHost },	// Publishers are sendonly
-		success: function(jsep) {
-			Janus.debug("Got publisher SDP!");
-			Janus.debug(jsep);
-			var publish = { "request": "configure", "audio": true, "video": isHost };
-			janusHandle.send({"message": publish, "jsep": jsep});
-		},
-		error: function(error) {
-			Janus.error("WebRTC error:", error);
-			if (useAudio) {
-					publishOwnFeed(false);
-			} else {
-				bootbox.alert("WebRTC error... " + JSON.stringify(error));
-				$(LOCAL_LABEL_ID).removeAttr('disabled').click(function() { publishOwnFeed(true); });
-			}
-		}
-	});
-}
-
-function toggleMute() {
-	var muted = janusHandle.isAudioMuted();
-	Janus.log((muted ? "Unmuting" : "Muting") + " local stream...");
-	if(muted)
-		janusHandle.unmuteAudio();
-	else
-		janusHandle.muteAudio();
-	muted = janusHandle.isAudioMuted();
-	$('#mute').html(muted ? "Unmute" : "Mute");
-}
-
-function unpublishOwnFeed() {
-	// Unpublish our stream
-	$('#unpublish').attr('disabled', true).unbind('click');
-	var unpublish = { "request": "unpublish" };
-	janusHandle.send({"message": unpublish});
-}
-
-function newRemoteFeed(id, display, audio, video) {
-	// A new feed has been published, create a new plugin handle and attach to it as a subscriber
-	var remoteFeed = null;
-	janus.attach({
-		plugin: "janus.plugin.videoroom",
-		opaqueId: opaqueId,
-		success: function(pluginHandle) {
-			remoteFeed = pluginHandle;
-			Janus.log("Remote Feed plugin attached! (" + remoteFeed.getPlugin() + ", id=" + remoteFeed.getId() + ")");
-			Janus.log("  -- This is a subscriber");
-			// We wait for the plugin to send us an offer
-			var listen = { "request": "join", "room": room, "ptype": "subscriber", "feed": id, "private_id": mypvtid };
-			// In case you don't want to receive audio, video or data, even if the
-			// publisher is sending them, set the 'offer_audio', 'offer_video' or
-			// 'offer_data' properties to false (they're true by default), e.g.:
-			// 		listen["offer_video"] = false;
-			// For example, if the publisher is VP8 and this is Safari, let's avoid video
-			if(video !== "h264" && Janus.webRTCAdapter.browserDetails.browser === "safari") {
-				if(video)
-					video = video.toUpperCase()
-				toastr.warning("Publisher is using " + video + ", but Safari doesn't support it: disabling video");
-				listen["offer_video"] = false;
-			}
-			//tell the feed we're listening
-			remoteFeed.send({"message": listen});
-		},
-		error: function(error) {
-			Janus.error("  -- Error attaching plugin...", error);
-			bootbox.alert("Error attaching plugin... " + error);
-		},
-		onmessage: function(msg, jsep) {
-			Janus.debug(" ::: Remote subscriber got a message :::");
-			Janus.debug(msg);
-			var event = msg["videoroom"];
-			Janus.debug("Event: " + event);
-			if(msg["error"] !== undefined && msg["error"] !== null) {
-				bootbox.alert(msg["error"]);
-			} else if (event != undefined && event != null) {
-				if (event === "attached") {
-					// Subscriber created and attached
-					Janus.debug("===New remote feed attached");
-
-					remoteFeed.rfindex = -1;
-					remoteFeed.rfid = msg["id"];
-					remoteFeed.rfdisplay = msg["display"];
-
-					if (remoteFeed.rfdisplay === HOST_USERNAME) {
-						Janus.debug("=====It's the host feed");
-						//if this is the host stream it always goes to vid0
-						remoteFeed.rfindex = 0;
-						if(remoteFeed.spinner === undefined || remoteFeed.spinner === null) {
-							var target = document.getElementById('video' + remoteFeed.rfindex);
-							remoteFeed.spinner = new Spinner({top:100}).spin(target);
-						} else {
-							remoteFeed.spinner.spin();
-						}
-						Janus.log("Successfully attached to feed " + remoteFeed.rfid + " (" + remoteFeed.rfdisplay + ") in room " + msg["room"]);
-						$('#videolabel' + remoteFeed.rfindex).removeClass('d-none').html(remoteFeed.rfdisplay).show();
-						feeds[0] = remoteFeed;
-					} else {
-						//if its not the host stream, find the first available
-						//put the feed info in the first available array slot
-						for (var i = REMOTE_INIT_INDEX; i < MAX_PARTICIPANTS; i++) {
-							if(feeds[i] === undefined || feeds[i] === null) {
-								feeds[i] = remoteFeed;
-								remoteFeed.rfindex = i;
-								break;
-							}
-						}
-					}
-					Janus.debug("=====Remote feed is set as # " + remoteFeed.rfindex);
-				}
-			}
-			if(jsep !== undefined && jsep !== null) {
-				Janus.debug("Handling SDP as well...");
-				Janus.debug(jsep);
-				// Answer and attach
-				remoteFeed.createAnswer({
-					jsep: jsep,
-					// Add data:true here if you want to subscribe to datachannels as well
-					// (obviously only works if the publisher offered them in the first place)
-					media: { audioSend: false, videoSend: false },	// We want recvonly audio/video
-					success: function(jsep) {
-						Janus.debug("Got SDP!");
-						Janus.debug(jsep);
-						var body = { "request": "start", "room": room };
-						remoteFeed.send({"message": body, "jsep": jsep});
-					},
-					error: function(error) {
-						Janus.error("WebRTC error:", error);
-						bootbox.alert("WebRTC error... " + JSON.stringify(error));
-					}
-				});
-			}
-		},
-		webrtcState: function(on) {
-			Janus.log("Janus says this WebRTC PeerConnection (feed #" + remoteFeed.rfindex + ") is " + (on ? "up" : "down") + " now");
-		},
-		onlocalstream: function(stream) {
-			// The subscriber stream is recvonly, we don't expect anything here
-		},
-		onremotestream: function(stream) {
-			Janus.debug("Remote feed #" + remoteFeed.rfindex);
-			var addButtons = false;
-			
-			//make a video object for the remote feed
-			var containerNum = remoteFeed.rfindex > 0 ? 1 : 0;
-			if ($('#remotevideo'+remoteFeed.rfindex).length === 0) {
-				// No remote video yet
-				$('#videocontainer' + containerNum).append('<video class="rounded centered" id="waitingvideo' + remoteFeed.rfindex + '" width=320 height=240 />');
-				$('#videocontainer' + containerNum).append('<video class="rounded centered relative d-none" id="remotevideo' + remoteFeed.rfindex + '" width="100%" height="100%" autoplay/>');
-				
-				if (containerNum === 0) {
-					$('#videocontainer' + containerNum).append(
-						// '<span class="label label-primary hide" id="curres'+remoteFeed.rfindex+'" style="position: absolute; bottom: 0px; left: 0px; margin: 15px;"></span>' +
-						'<span class="badge badge-pill badge-secondary d-none" id="curbitrate'+remoteFeed.rfindex+'" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;"></span>');
-				}
-				// Show the video, hide the spinner and show the resolution when we get a playing event
-				$("#remotevideo" + remoteFeed.rfindex).bind("playing", function () {
-					if(remoteFeed.spinner !== undefined && remoteFeed.spinner !== null)
-						remoteFeed.spinner.stop();
-					remoteFeed.spinner = null;
-					$('#waitingvideo'+remoteFeed.rfindex).remove();
-				});
-			}
-
-
-			//setup video if this is the host feed
-			if (remoteFeed.rfdisplay === HOST_USERNAME) {
-				Janus.debug("==This is the remote host stream to attach");
-				//it's the host stream, add to the main panewe got the
-				addButtons = true;
-			} else {
-				//if it's a normal audio-only participant, just add it to the list:
-				if ($('#rp' + remoteFeed.rfid).length === 0) {
-					//if this stream isn't already on the list, add it
-					$('#clientlist').append('<li id="rp' + remoteFeed.rfid + '" class="list-group-item">' + remoteFeed.rfdisplay 
-						+ ' <i class="abmuted fa fa-microphone-slash"></i></li>');
-					$('#rp' + remoteFeed.rfid + ' > i').hide();
-				}
-			}
-
-			Janus.attachMediaStream($('#remotevideo'+remoteFeed.rfindex).get(0), stream);
-			var videoTracks = stream.getVideoTracks();
-			if (videoTracks === null || videoTracks === undefined || videoTracks.length === 0) {
-				// No remote video
-				if (remoteFeed.rfdisplay === HOST_USERNAME) {
-					//if this is the host stream and it has no video
-					//display a nice little icon indicating this
-					$('#remotevideo'+remoteFeed.rfindex).hide();
-					if($('#videocontainer'+remoteFeed.rfindex + ' .no-video-container').length === 0) {
-						$('#videocontainer'+remoteFeed.rfindex).append(
-							'<div class="no-video-container">' +
-								'<i class="fa fa-video-camera fa-5 no-video-icon"></i>' +
-								'<span class="no-video-text">No remote video available</span>' +
-							'</div>');
-					}
-				}
-			} else {
-				$('#videocontainer'+remoteFeed.rfindex+ ' .no-video-container').remove();
-				$('#remotevideo'+remoteFeed.rfindex).removeClass('d-none').show();
-			}
-
-			if (!addButtons)
-				return;
-			//bitrate time junk:
-			if (remoteFeed.rfdisplay === HOST_USERNAME && (Janus.webRTCAdapter.browserDetails.browser === "chrome" 
-				|| Janus.webRTCAdapter.browserDetails.browser === "firefox" || Janus.webRTCAdapter.browserDetails.browser === "safari")) {
-				$('#curbitrate'+remoteFeed.rfindex).removeClass('d-none').show();
-				bitrateTimer[remoteFeed.rfindex] = setInterval(function() {
-					// Display updated bitrate, if supported
-					var bitrate = remoteFeed.getBitrate();
-					$('#curbitrate'+remoteFeed.rfindex).text(bitrate);
-				}, 1000);
-			}
-		},
-		oncleanup: function() {
-			Janus.log(" ::: Got a cleanup notification (remote feed " + id + ") :::");
-			
-			if (remoteFeed.rfindex === 0) {
-				//if it's the host feed:
-				if(remoteFeed.spinner !== undefined && remoteFeed.spinner !== null)
-					remoteFeed.spinner.stop();
-				remoteFeed.spinner = null;
-				$('#novideo'+remoteFeed.rfindex).remove();
-				$('#curbitrate'+remoteFeed.rfindex).remove();
-			} else {
-				$('#rp' + remoteFeed.rfid).remove();
-			}
-			$('#remotevideo' + remoteFeed.rfindex).remove();
-			$('#waitingvideo' + remoteFeed.rfindex).remove();
-			
-			if(bitrateTimer[remoteFeed.rfindex] !== null && bitrateTimer[remoteFeed.rfindex] !== undefined) 
-				clearInterval(bitrateTimer[remoteFeed.rfindex]);
-			bitrateTimer[remoteFeed.rfindex] = null;
-		}
-	});
-}
-
-/**
- * Helper method
- * Connects to the default stream for the room
- * The stream is a non-WebRTC stream published by something
- */
-function connectRoomStream() {
-	// Request to watch the default stream for the room.
-	var request = {"request": "watch", "id": room};
-	streamingHandle.send({"message": request});
-}
-
-// Helper to parse query string
-function getQueryStringValue(name) {
-	name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
-	var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
-		results = regex.exec(location.search);
-	return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
 }
