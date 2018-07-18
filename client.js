@@ -6,29 +6,31 @@
 //TODO: Eventually this code will be client/participant only -> will need
 //to weed most of the host code (clients will still need to recognize)
 //when a remote feed is 
-const HOST_USERNAME = "cfe331345cb7443aaf92";
 var server = "https://" + window.location.hostname + ":8089/janus";
 
 var isHost = (getQueryStringValue("c") === "1" || getQueryStringValue("c") === "y");
 var room   = Number(getQueryStringValue("r"));
-const MAX_PARTICIPANTS = 6;
-const REMOTE_INIT_INDEX = isHost ? 1 : 2;
-const LOCAL_VIDEO_ID = isHost ? '#videocontainer0' : '#videocontainer1';
-const LOCAL_LABEL_ID = isHost ? '#videolabel0' : '#videolabel1';
+
+//should be able to get rid of all this crap
+//const MAX_PARTICIPANTS = 6;
+//const REMOTE_INIT_INDEX = isHost ? 1 : 2;
+//const LOCAL_VIDEO_ID = isHost ? '#videocontainer0' : '#videocontainer1';
+//const LOCAL_LABEL_ID = isHost ? '#videolabel0' : '#videolabel1';
+//var feeds = [];
 
 var janus = null;
 var audioHandle = null;
 var streamingHandle = null;
-var opaqueId = "videoroomtest-" + Janus.randomString(12);
+var opaqueId = "demo-" + Janus.randomString(12);
 
 var myusername = null;
 var myid = null;
 var mystream = null;
 // We use this other ID just to map our subscriptions to us
-var mypvtid = null;
-
-var feeds = [];
-var bitrateTimer = [];
+//var mypvtid = null;
+var webrtcUp = false;
+var audioenabled = false;
+var bitrateTimer;
 
 window.onbeforeunload = function(event) {
 	// janus.destroy(); // potential issue if janus not initialized
@@ -56,45 +58,22 @@ $(document).ready(function() {
 			success: function() {
 				// Attach to video room plugin
 				janus.attach({
-					plugin: "janus.plugin.videoroom",
+					plugin: "janus.plugin.audiobridge",
 					opaqueId: opaqueId,
 					success: function(pluginHandle) {
-						janusHandle = pluginHandle;
-						Janus.log("Plugin attached! (" + janusHandle.getPlugin() + ", id=" + janusHandle.getId() + ")");
+						audioHandle = pluginHandle;
+						Janus.log("Plugin attached! (" + audioHandle.getPlugin() + ", id=" + audioHandle.getId() + ")");
+						// Prepare the username registration
+						$('#videojoin').removeClass('d-none').show();
+						$('#register').click(registerUsername);
+						$('#username').focus();
 						$('#stop').click(function() {
 							$(this).attr('disabled', true);
-							if (isHost) {
-								Janus.debug("===SENDING DESTROY REQUEST===");
-								var destroy = {"request": "destroy", "room": room};
-								janusHandle.send({"message": destroy});
-							}
 							janus.destroy();
 						});
-
-						if (isHost) {
-							Janus.debug("---we're the host, sending a create request");
-							//create the room first
-							var register = {
-								"request": "create", 
-								"is_private": true, 
-								"publishers": 6, 
-								"bitrate": 128000, 
-								"fir_freq": 10,
-								"record": false};
-							if (room !== 0) {
-								register["room"] = room;
-							}
-							janusHandle.send({"message": register});
-						} else {
-							// Prepare the username registration
-							$('#videojoin').removeClass('d-none').show();
-							//$('#registernow').removeClass('hide').show();
-							$('#register').click(registerUsername);
-							$('#username').focus();
-						}
 					},
 					error: function(error) {
-						Janus.error("Error attaching videoroom plugin...", error);
+						Janus.error("Error attaching audiobridge plugin...", error);
 						bootbox.alert("Error attaching plugin... " + error);
 					},
 					consentDialog: function(on) {
@@ -116,156 +95,87 @@ $(document).ready(function() {
 							$.unblockUI();
 						}
 					},
-					mediaState: function(medium, on) {
-						Janus.log("Janus " + (on ? "started" : "stopped") + " receiving our " + medium);
-					},
-					webrtcState: function(on) {
-						Janus.log("Janus says our WebRTC PeerConnection is " + (on ? "up" : "down") + " now");
-						$(LOCAL_VIDEO_ID).parent().parent().unblock();
-						// This controls allows us to override the global room bitrate cap
-						$('#bitrate').parent().parent().removeClass('d-none').show();
-						$('#bitrate a').click(function() {
-							var id = $(this).attr("id");
-							var bitrate = parseInt(id)*1000;
-							if(bitrate === 0) {
-								Janus.log("Not limiting bandwidth via REMB");
-							} else {
-								Janus.log("Capping bandwidth to " + bitrate + " via REMB");
-							}
-							$('#bitrateset').html($(this).html() + '<span class="caret"></span>').parent().removeClass('open');
-							janusHandle.send({"message": { "request": "configure", "bitrate": bitrate }});
-							return false;
-						});
-					},
 					onmessage: function(msg, jsep) {
-						Janus.debug(" ==> Videoroom publisher got a message:");
+						Janus.debug(" ::: Got a message :::");
 						Janus.debug(msg);
-						var event = msg["videoroom"];
+						var event = msg["audiobridge"];
+						Janus.debug("Event: " + event);
 						if (event != undefined && event != null) {
 							if (event === "joined") {
-								// Publisher/manager created, negotiate WebRTC and attach to existing feeds, if any
+								// Successfully joined, negotiate WebRTC now
 								myid = msg["id"];
-								mypvtid = msg["private_id"];
 								Janus.log("Successfully joined room " + msg["room"] + " with ID " + myid);
-								publishOwnFeed(true);
+								if(!webrtcUp) {
+									webrtcUp = true;
+									// Publish our stream
+									audioHandle.createOffer({
+										media: { video: false},	// This is an audio only room
+										success: function(jsep) {
+											Janus.debug("Got SDP!");
+											Janus.debug(jsep);
+											var publish = { "request": "configure", "muted": false };
+											audioHandle.send({"message": publish, "jsep": jsep});
+										},
+										error: function(error) {
+											Janus.error("WebRTC error:", error);
+											bootbox.alert("WebRTC error... " + JSON.stringify(error));
+										}
+									});
+								}
 
+								// if we have a streaming handle, connect to the default stream for the room;
 								if (streamingHandle !== null) {
-									//if we have a streaming handle, connect to the default stream for the room;
 									connectRoomStream();
 								}
-								// Any new feed to attach to? --> Remote feeds only (not local)
-								if (msg["publishers"] !== undefined && msg["publishers"] !== null) {
-									var list = msg["publishers"];
-									Janus.debug("Got a list of available publishers/feeds:");
-									Janus.debug(list);
-									for(var f in list) {
-										var id = list[f]["id"];
-										var display = list[f]["display"];
-										var audio = list[f]["audio_codec"];
-										var video = list[f]["video_codec"] === null || list[f]["video_codec"] === undefined ? "" : list[f]["video_codec"] === null;
-										Janus.debug("  >> [" + id + "] " + display + " (audio: " + audio + ", video: " + video + ")");
-										newRemoteFeed(id, display, audio, video);
-									}
+
+								// Any room participant?
+								if (msg["participants"] !== undefined && msg["participants"] !== null) {
+									var list = msg["participants"];
+									generateParticipantList(list);
 								}
-							} else if (event === "destroyed") {
+							} else if(event === "roomchanged") {
+								// The user switched to a different room
+								myid = msg["id"];
+								Janus.log("Moved to room " + msg["room"] + ", new ID: " + myid);
+								// Any room participant?
+								if(msg["participants"] !== undefined && msg["participants"] !== null) {
+									var list = msg["participants"];
+									generateParticipantList(list);
+								}
+							} else if(event === "destroyed") {
 								// The room has been destroyed
-								Janus.warn("The room has been closed!");
-								bootbox.alert("The room has been closed", function() {
+								Janus.warn("The room has been destroyed!");
+								bootbox.alert("The room has been destroyed", function() {
 									window.location.reload();
 								});
-							} else if (event === "event") {
-								//see if this is an error event
-								if(msg["error"] !== undefined && msg["error"] !== null) {
-									if(msg["error_code"] === 426) {
+							} else if(event === "event") {
+								if (msg["participants"] !== undefined && msg["participants"] !== null) {
+									var list = msg["participants"];
+									generateParticipantList(list);
+
+								} else if(msg["error"] !== undefined && msg["error"] !== null) {
+									if(msg["error_code"] === 485) {
 										// This is a "no such room" error: give a more meaningful description
-										bootbox.alert(
-											"Room <code>" + room + "</code> does not exist");
+										bootbox.alert("Room <code>" + room + "</code> does not exist");
 									} else {
 										bootbox.alert(msg["error"]);
 									}
 									return;
 								}
-
-								//remote feed subscription management.
-								// if we're host we dont care about this stuff:
-								if (!isHost) {
-									if(msg["publishers"] !== undefined && msg["publishers"] !== null) {
-										var list = msg["publishers"];
-										Janus.debug("Got a list of available publishers/feeds:");
-										Janus.debug(list);
-										for(var f in list) {
-											var id = list[f]["id"];
-											var display = list[f]["display"];
-											var audio = list[f]["audio_codec"];
-											var video = list[f]["video_codec"];
-											Janus.debug("  >> [" + id + "] " + display + " (audio: " + audio + ", video: " + video + ")");
-											newRemoteFeed(id, display, audio, video);
-										}
-									} else if(msg["leaving"] !== undefined && msg["leaving"] !== null) {
-										// One of the publishers has gone away?
-										var leaving = msg["leaving"];
-										Janus.log("Publisher left: " + leaving);
-										var remoteFeed = null;
-										for(var i=1; i<6; i++) {
-											if(feeds[i] != null && feeds[i] != undefined && feeds[i].rfid == leaving) {
-												remoteFeed = feeds[i];
-												break;
-											}
-										}
-										if(remoteFeed != null) {
-											Janus.debug("Feed " + remoteFeed.rfid + " (" + remoteFeed.rfdisplay + ") has left the room, detaching");
-											$('#videolabel'+remoteFeed.rfindex).empty().hide();
-											$('#videocontainer'+remoteFeed.rfindex).empty();
-											feeds[remoteFeed.rfindex] = null;
-											remoteFeed.detach();
-										}
-									} else if(msg["unpublished"] !== undefined && msg["unpublished"] !== null) {
-										// One of the publishers has unpublished?
-										var unpublished = msg["unpublished"];
-										Janus.log("Publisher left: " + unpublished);
-										if(unpublished === 'ok') {
-											// That's us
-											janusHandle.hangup();
-											return;
-										}
-										var remoteFeed = null;
-										for(var i=1; i<6; i++) {
-											if(feeds[i] != null && feeds[i] != undefined && feeds[i].rfid == unpublished) {
-												remoteFeed = feeds[i];
-												break;
-											}
-										}
-										if(remoteFeed != null) {
-											Janus.debug("Feed " + remoteFeed.rfid + " (" + remoteFeed.rfdisplay + ") has left the room, detaching");
-											$('#videolabel'+remoteFeed.rfindex).empty().hide();
-											$('#videocontainer'+remoteFeed.rfindex).empty();
-											feeds[remoteFeed.rfindex] = null;
-											remoteFeed.detach();
-										}
-									}
-								} 
-							} else if (event === "created") {
-								Janus.debug("room created! username will indicate we're host");
-								room = msg["room"];
-								$('#stop').html("Close Room");
-								$('#h1Title').html("Room #" + room);
-								myusername = HOST_USERNAME;
-								username = HOST_USERNAME;
-								var register = { "request": "join", "room": room, "ptype": "publisher", "display": username };
-								janusHandle.send({"message": register});
+								// Any new feed to attach to?
+								if(msg["leaving"] !== undefined && msg["leaving"] !== null) {
+									// One of the participants has gone away?
+									var leaving = msg["leaving"];
+									Janus.log("Participant left: " + leaving + " (we have " + $('#rp' + leaving).length + " elements with ID #rp" + leaving + ")");
+									$('#rp' + leaving).remove();
+								}
 							}
 						}
+
 						if(jsep !== undefined && jsep !== null) {
 							Janus.debug("Handling SDP as well...");
 							Janus.debug(jsep);
-							janusHandle.handleRemoteJsep({jsep: jsep});
-							// Check if any of the media we wanted to publish has
-							// been rejected (e.g., wrong or unsupported codec)
-							var audio = msg["audio_codec"];
-							if(mystream && mystream.getAudioTracks() && mystream.getAudioTracks().length > 0 && !audio) {
-								// Audio consent has been rejected
-								toastr.warning("Our audio stream has been rejected, viewers won't hear us");
-							}
+							audioHandle.handleRemoteJsep({jsep: jsep});
 						}
 					},
 					onlocalstream: function(stream) {
@@ -277,72 +187,32 @@ $(document).ready(function() {
 						Janus.debug(stream);
 						//hide the login screen (where you pick a username)
 						$('#videojoin').hide();
-
 						//show all the video containers
-						$('#videos').removeClass('d-none').show();
+						$('#mediacontainer').removeClass('d-none').show();
 						$('#stop').removeClass('d-none').show();
-
-						// TODO: this is trash
-						//  I dont know why, but for non-host streams i can only get them
-						//  to work when i attach them to a video element as below
-						if ($('#video0').length === 0) {
-							$(LOCAL_VIDEO_ID).append('<video class="rounded centered d-none" id="video0" width="100%" height="100%" autoplay muted="muted"/>');
-						}
-
-						if (isHost) {
-							$(LOCAL_VIDEO_ID).append('<button class="btn btn-warning" id="mute" style="position: absolute; bottom: 0px; left: 0px; margin: 15px;">Mute</button>');
-							$('#mute').click(toggleMute);
-							// Add an 'unpublish' button
-							$(LOCAL_VIDEO_ID).append('<button class="btn btn-warning" id="unpublish" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;">Unpublish</button>');
-							$('#unpublish').click(unpublishOwnFeed);
-							if (janusHandle.webrtcStuff.pc.iceConnectionState !== "completed" &&
-								janusHandle.webrtcStuff.pc.iceConnectionState !== "connected") {
-								$(LOCAL_VIDEO_ID).parent().parent().block({
-									message: '<b>Publishing...</b>',
-									css: {
-										border: 'none',
-										backgroundColor: 'transparent',
-										color: 'white'
-									}
-								});
-							}
-							//still want the pretty username label up top tho
-							$(LOCAL_LABEL_ID).removeClass('d-none').html(myusername).show();
-						} else {
-							//add yourself to the participants list:
-							if ($('#rp' + myid).length === 0) {
-								
-								//if this stream isn't already on the list, add it
-								$('#clientlist').append('<li id="rp' + myid + '" class="list-group-item list-group-item-info">' + myusername 
-								+ ' <i class="abmuted fa fa-microphone-slash"></i></li>');
-								$('#rp' + myid + ' > i').hide();
-								//bind the mute button
-								$('#mute').removeClass('d-none').show();
-								$('#mute').click(toggleMute);
-							}
-						}
-
-						Janus.attachMediaStream($('#video0').get(0), stream);
-						// $(LOCAL_VIDEO_ID).get(0).muted = "muted";
-						
-						var videoTracks = stream.getVideoTracks();
-						if(videoTracks === null || videoTracks === undefined || videoTracks.length === 0) {
-							// No webcam
-							$('#video0').hide();
-						} else {
-							// $(LOCAL_VIDEO_ID + ' .no-video-container').remove();
-							$('#video0').removeClass('d-none').show();
-						}
 					},
 					onremotestream: function(stream) {
-						// The publisher stream is sendonly, we don't expect anything here
+						$('#mediacontainer').removeClass('d-none').show();
+						var addMute = false;
+						if ($('#mixedaudio').length === 0) {
+							addMute = true;
+							$('#audiocontainer0').append('<audio class="rounded centered" id="mixedaudio" width="100%" height="100%" autoplay/>');
+						}
+						Janus.attachMediaStream($('#mixedaudio').get(0), stream);
+
+						if (addMute) {
+							audioenabled = true;
+							$('#mute').click(function() {
+								audioenabled = !audioenabled;
+								$('#mute').html(audioenabled ? "Mute" : "Unmute");
+								audioHandle.send({message: {"request": "configure", "muted": !audioenabled}});
+							}).removeClass('d-none').show();
+						}
 					},
 					oncleanup: function() {
-						Janus.log(" ::: Got a cleanup notification: we are unpublished now :::");
-						mystream = null;
-						$(LOCAL_VIDEO_ID).html('<button id="publish" class="btn btn-primary">Publish</button>');
-						$(LOCAL_LABEL_ID).click(function() { publishOwnFeed(true); });
-						$(LOCAL_VIDEO_ID).parent().parent().unblock();
+						Janus.log(" ::: Got a cleanup notification :::");
+						webrtcUp = false;
+						$('#clientlist').empty();
 						$('#bitrate').parent().parent().addClass('d-none');
 						$('#bitrate a').unbind('click');
 					}
@@ -462,6 +332,35 @@ $(document).ready(function() {
 	}});
 });
 
+function generateParticipantList(list) {
+	$('#clientlist').empty();
+	Janus.debug("Got a list of participants:");
+	Janus.debug(list);
+	for (var f in list) {
+		var id = list[f]["id"];
+		var display = list[f]["display"];
+		var setup = list[f]["setup"];
+		var muted = list[f]["muted"];
+
+		Janus.debug("  >> [" + id + "] " + display + " (setup=" + setup + ", muted=" + muted + ")");
+		if ($('#rp' + id).length === 0) {
+			// Add to the participants list
+			$('#clientlist').append('<li id="rp' + id + '" class="list-group-item">' + display +
+				' <i class="absetup fa fa-chain-broken"></i>' +
+				' <i class="abmuted fa fa-microphone-slash"></i></li>');
+			$('#rp' + id + ' > i').addClass('d-none').hide();
+		}
+		if (muted === true || muted === "true")
+			$('#rp' + id + ' > i.abmuted').removeClass('d-none').show();
+		else
+			$('#rp' + id + ' > i.abmuted').addClass('d-none').hide();
+		if (setup === true || setup === "true")
+			$('#rp' + id + ' > i.absetup').addClass('d-none').hide();
+		else
+			$('#rp' + id + ' > i.absetup').removeClass('d-none').show();
+	}
+}
+
 /**
  * Helper method
  * Connects to the default stream for the room
@@ -519,7 +418,7 @@ function registerUsername() {
 			$('#register').removeAttr('disabled').click(registerUsername);
 			return;
 		}
-		var register = {"request": "join", "room": myroom, "display": username};
+		var register = {"request": "join", "room": room, "display": username};
 		myusername = username;
 		audioHandle.send({"message": register});
 	}
