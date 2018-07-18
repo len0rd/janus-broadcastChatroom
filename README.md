@@ -273,7 +273,7 @@ URL: `https://localhost:8089/janus/sessionEndpointInteger/streamingPluginHandleE
     "transaction": "mostDifferentRandomString",
     "body": {
         "request": "create",
-        "is_private": false,
+        "is_private": true,
         "id": ID,
         "type": "rtp",
         "audio": false,

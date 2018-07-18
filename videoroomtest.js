@@ -59,10 +59,8 @@ $(document).ready(function() {
 					plugin: "janus.plugin.videoroom",
 					opaqueId: opaqueId,
 					success: function(pluginHandle) {
-						//$('#details').remove();
 						janusHandle = pluginHandle;
 						Janus.log("Plugin attached! (" + janusHandle.getPlugin() + ", id=" + janusHandle.getId() + ")");
-						Janus.log("  -- This is a publisher/manager");
 						$('#stop').click(function() {
 							$(this).attr('disabled', true);
 							if (isHost) {
@@ -96,7 +94,7 @@ $(document).ready(function() {
 						}
 					},
 					error: function(error) {
-						Janus.error("  -- Error attaching videoroom plugin...", error);
+						Janus.error("Error attaching videoroom plugin...", error);
 						bootbox.alert("Error attaching plugin... " + error);
 					},
 					consentDialog: function(on) {
@@ -140,11 +138,10 @@ $(document).ready(function() {
 						});
 					},
 					onmessage: function(msg, jsep) {
-						Janus.debug(" ::: Got a message (publisher) :::");
+						Janus.debug(" ==> Videoroom publisher got a message:");
 						Janus.debug(msg);
 						var event = msg["videoroom"];
-						Janus.debug("Event: " + event);
-						if(event != undefined && event != null) {
+						if (event != undefined && event != null) {
 							if (event === "joined") {
 								// Publisher/manager created, negotiate WebRTC and attach to existing feeds, if any
 								myid = msg["id"];
@@ -157,7 +154,7 @@ $(document).ready(function() {
 									connectRoomStream();
 								}
 								// Any new feed to attach to? --> Remote feeds only (not local)
-								if(msg["publishers"] !== undefined && msg["publishers"] !== null) {
+								if (msg["publishers"] !== undefined && msg["publishers"] !== null) {
 									var list = msg["publishers"];
 									Janus.debug("Got a list of available publishers/feeds:");
 									Janus.debug(list);
@@ -266,25 +263,15 @@ $(document).ready(function() {
 							// been rejected (e.g., wrong or unsupported codec)
 							var audio = msg["audio_codec"];
 							if(mystream && mystream.getAudioTracks() && mystream.getAudioTracks().length > 0 && !audio) {
-								// Audio has been rejected
+								// Audio consent has been rejected
 								toastr.warning("Our audio stream has been rejected, viewers won't hear us");
-							}
-							var video = msg["video_codec"];
-							if(mystream && mystream.getVideoTracks() && mystream.getVideoTracks().length > 0 && !video) {
-								// Video has been rejected
-								toastr.warning("Our video stream has been rejected, viewers won't see us");
-								// Hide the webcam video
-								$('#video0').hide();
-								$(LOCAL_VIDEO_ID).append(
-									'<div class="no-video-container">' +
-										'<i class="fa fa-video-camera fa-5 no-video-icon" style="height: 100%;"></i>' +
-										'<span class="no-video-text" style="font-size: 16px;">Video rejected, no webcam</span>' +
-									'</div>');
 							}
 						}
 					},
 					onlocalstream: function(stream) {
-
+						//deals with properly attaching the local stream
+						//note that clients cannot hear themselves, only 
+						//the other people on the call
 						Janus.debug(" ::: Got local stream :::");
 						mystream = stream;
 						Janus.debug(stream);
@@ -303,15 +290,11 @@ $(document).ready(function() {
 						}
 
 						if (isHost) {
-							// if($('#video0').length === 0) {
-								// $(LOCAL_VIDEO_ID).append('<video class="rounded centered" id="video0" width="100%" height="100%" autoplay muted="muted"/>');
-								// Add a 'mute' button
-								$(LOCAL_VIDEO_ID).append('<button class="btn btn-warning" id="mute" style="position: absolute; bottom: 0px; left: 0px; margin: 15px;">Mute</button>');
-								$('#mute').click(toggleMute);
-								// Add an 'unpublish' button
-								$(LOCAL_VIDEO_ID).append('<button class="btn btn-warning" id="unpublish" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;">Unpublish</button>');
-								$('#unpublish').click(unpublishOwnFeed);
-							// }
+							$(LOCAL_VIDEO_ID).append('<button class="btn btn-warning" id="mute" style="position: absolute; bottom: 0px; left: 0px; margin: 15px;">Mute</button>');
+							$('#mute').click(toggleMute);
+							// Add an 'unpublish' button
+							$(LOCAL_VIDEO_ID).append('<button class="btn btn-warning" id="unpublish" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;">Unpublish</button>');
+							$('#unpublish').click(unpublishOwnFeed);
 							if (janusHandle.webrtcStuff.pc.iceConnectionState !== "completed" &&
 								janusHandle.webrtcStuff.pc.iceConnectionState !== "connected") {
 								$(LOCAL_VIDEO_ID).parent().parent().block({
@@ -339,32 +322,17 @@ $(document).ready(function() {
 							}
 						}
 
-						Janus.debug("===1");
 						Janus.attachMediaStream($('#video0').get(0), stream);
 						// $(LOCAL_VIDEO_ID).get(0).muted = "muted";
 						
-						
-						Janus.debug("===2");
-						
 						var videoTracks = stream.getVideoTracks();
-						Janus.debug("===3");
 						if(videoTracks === null || videoTracks === undefined || videoTracks.length === 0) {
 							// No webcam
 							$('#video0').hide();
-							//if no video was granted, this shows a little icon indicating that
-							//TODO:: in future only appear on host stream??
-							// if ($(LOCAL_VIDEO_ID + ' .no-video-container').length === 0) {
-							// 	$(LOCAL_VIDEO_ID).append(
-							// 		'<div class="no-video-container">' +
-							// 			'<i class="fa fa-video-camera fa-5 no-video-icon"></i>' +
-							// 			'<span class="no-video-text">No webcam available</span>' +
-							// 		'</div>');
-							// }
 						} else {
 							// $(LOCAL_VIDEO_ID + ' .no-video-container').remove();
 							$('#video0').removeClass('d-none').show();
 						}
-						Janus.debug("===4");
 					},
 					onremotestream: function(stream) {
 						// The publisher stream is sendonly, we don't expect anything here
@@ -785,6 +753,7 @@ function newRemoteFeed(id, display, audio, video) {
 /**
  * Helper method
  * Connects to the default stream for the room
+ * The stream is a non-WebRTC stream published by something
  */
 function connectRoomStream() {
 	// Request to watch the default stream for the room.
