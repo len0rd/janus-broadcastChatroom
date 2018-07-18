@@ -8,23 +8,14 @@
 //when a remote feed is 
 var server = "https://" + window.location.hostname + ":8089/janus";
 
-var isHost = (getQueryStringValue("c") === "1" || getQueryStringValue("c") === "y");
-var room   = Number(getQueryStringValue("r"));
-
-//should be able to get rid of all this crap
-//const MAX_PARTICIPANTS = 6;
-//const REMOTE_INIT_INDEX = isHost ? 1 : 2;
-//const LOCAL_VIDEO_ID = isHost ? '#videocontainer0' : '#videocontainer1';
-//const LOCAL_LABEL_ID = isHost ? '#videolabel0' : '#videolabel1';
-//var feeds = [];
-
+const room   = Number(getQueryStringValue("r"));
 var janus = null;
 var audioHandle = null;
 var streamingHandle = null;
 var opaqueId = "demo-" + Janus.randomString(12);
 
 var myusername = null;
-var myid = null;
+var myid;
 var mystream = null;
 // We use this other ID just to map our subscriptions to us
 //var mypvtid = null;
@@ -32,14 +23,12 @@ var webrtcUp = false;
 var audioenabled = false;
 var bitrateTimer;
 
-window.onbeforeunload = function(event) {
-	// janus.destroy(); // potential issue if janus not initialized
-	if (janusHandle !== null && isHost) {
-		//try and send a destroy request... good luck getting it through in time
-		var destroy = {"request": "destroy", "room": room};
-		janusHandle.send({"message": destroy});
+window.onbeforeunload = function() {
+	if (audioHandle !== null) {
+		// try and at least fire off a leave before the page reloads
+		audioHandle.send({"message": {"request": "leave"}});
 	}
-};
+}
 
 $(document).ready(function() {
 	// Initialize the library (all console debuggers enabled)
@@ -56,7 +45,7 @@ $(document).ready(function() {
 		janus = new Janus({
 			server: server,
 			success: function() {
-				// Attach to video room plugin
+				// Attach to audiobridge plugin
 				janus.attach({
 					plugin: "janus.plugin.audiobridge",
 					opaqueId: opaqueId,
@@ -102,10 +91,11 @@ $(document).ready(function() {
 						Janus.debug("Event: " + event);
 						if (event != undefined && event != null) {
 							if (event === "joined") {
-								// Successfully joined, negotiate WebRTC now
-								myid = msg["id"];
-								Janus.log("Successfully joined room " + msg["room"] + " with ID " + myid);
+								// A joined event is triggered every time a new participant joins
 								if(!webrtcUp) {
+									// Successfully joined, negotiate WebRTC now
+									Janus.log("Successfully joined room " + msg["room"] + " with ID " + myid);
+									myid = msg["id"];
 									webrtcUp = true;
 									// Publish our stream
 									audioHandle.createOffer({
@@ -131,30 +121,21 @@ $(document).ready(function() {
 								// Any room participant?
 								if (msg["participants"] !== undefined && msg["participants"] !== null) {
 									var list = msg["participants"];
-									generateParticipantList(list);
+									updateParticipantList(list);
 								}
-							} else if(event === "roomchanged") {
-								// The user switched to a different room
-								myid = msg["id"];
-								Janus.log("Moved to room " + msg["room"] + ", new ID: " + myid);
-								// Any room participant?
-								if(msg["participants"] !== undefined && msg["participants"] !== null) {
-									var list = msg["participants"];
-									generateParticipantList(list);
-								}
-							} else if(event === "destroyed") {
+							} else if (event === "destroyed") {
 								// The room has been destroyed
 								Janus.warn("The room has been destroyed!");
 								bootbox.alert("The room has been destroyed", function() {
 									window.location.reload();
 								});
-							} else if(event === "event") {
+							} else if (event === "event") {
 								if (msg["participants"] !== undefined && msg["participants"] !== null) {
 									var list = msg["participants"];
-									generateParticipantList(list);
+									updateParticipantList(list);
 
-								} else if(msg["error"] !== undefined && msg["error"] !== null) {
-									if(msg["error_code"] === 485) {
+								} else if (msg["error"] !== undefined && msg["error"] !== null) {
+									if (msg["error_code"] === 485) {
 										// This is a "no such room" error: give a more meaningful description
 										bootbox.alert("Room <code>" + room + "</code> does not exist");
 									} else {
@@ -163,7 +144,7 @@ $(document).ready(function() {
 									return;
 								}
 								// Any new feed to attach to?
-								if(msg["leaving"] !== undefined && msg["leaving"] !== null) {
+								if (msg["leaving"] !== undefined && msg["leaving"] !== null) {
 									// One of the participants has gone away?
 									var leaving = msg["leaving"];
 									Janus.log("Participant left: " + leaving + " (we have " + $('#rp' + leaving).length + " elements with ID #rp" + leaving + ")");
@@ -172,7 +153,7 @@ $(document).ready(function() {
 							}
 						}
 
-						if(jsep !== undefined && jsep !== null) {
+						if (jsep !== undefined && jsep !== null) {
 							Janus.debug("Handling SDP as well...");
 							Janus.debug(jsep);
 							audioHandle.handleRemoteJsep({jsep: jsep});
@@ -202,10 +183,13 @@ $(document).ready(function() {
 
 						if (addMute) {
 							audioenabled = true;
+							updateSelf();
+
 							$('#mute').click(function() {
 								audioenabled = !audioenabled;
 								$('#mute').html(audioenabled ? "Mute" : "Unmute");
 								audioHandle.send({message: {"request": "configure", "muted": !audioenabled}});
+								updateSelf();
 							}).removeClass('d-none').show();
 						}
 					},
@@ -332,33 +316,49 @@ $(document).ready(function() {
 	}});
 });
 
-function generateParticipantList(list) {
-	$('#clientlist').empty();
+function updateParticipantList(list) {
+	// add self first
+	updateSelf();
+
 	Janus.debug("Got a list of participants:");
 	Janus.debug(list);
 	for (var f in list) {
 		var id = list[f]["id"];
 		var display = list[f]["display"];
-		var setup = list[f]["setup"];
 		var muted = list[f]["muted"];
+		var setup = list[f]["setup"];
 
-		Janus.debug("  >> [" + id + "] " + display + " (setup=" + setup + ", muted=" + muted + ")");
-		if ($('#rp' + id).length === 0) {
-			// Add to the participants list
-			$('#clientlist').append('<li id="rp' + id + '" class="list-group-item">' + display +
-				' <i class="absetup fa fa-chain-broken"></i>' +
-				' <i class="abmuted fa fa-microphone-slash"></i></li>');
-			$('#rp' + id + ' > i').addClass('d-none').hide();
-		}
-		if (muted === true || muted === "true")
-			$('#rp' + id + ' > i.abmuted').removeClass('d-none').show();
-		else
-			$('#rp' + id + ' > i.abmuted').addClass('d-none').hide();
-		if (setup === true || setup === "true")
-			$('#rp' + id + ' > i.absetup').addClass('d-none').hide();
-		else
-			$('#rp' + id + ' > i.absetup').removeClass('d-none').show();
+		addParticipant(id, display, muted, setup);
 	}
+}
+
+function updateSelf(setup) {
+	if (myid !== null && myid !== undefined) {
+		var tempSetup = setup !== null && setup !== undefined ? setup : true;
+		addParticipant(myid, myusername, !audioenabled, tempSetup);
+		$('#rp' + myid).addClass(' list-group-item-info');
+	} else {
+		Janus.warn('myid is undefined!!');
+	}
+}
+
+function addParticipant(id, display, muted, setup) {
+	Janus.debug("  >> [" + id + "] " + display + " (setup=" + setup + ", muted=" + muted + ")");
+	if ($('#rp' + id).length === 0) {
+		// Add to the participants list
+		$('#clientlist').append('<li id="rp' + id + '" class="list-group-item">' + display +
+			' <i class="absetup fa fa-chain-broken"></i>' +
+			' <i class="abmuted fa fa-microphone-slash"></i></li>');
+		$('#rp' + id + ' > i').addClass('d-none').hide();
+	}
+	if (muted === true || muted === "true")
+		$('#rp' + id + ' > i.abmuted').removeClass('d-none').show();
+	else
+		$('#rp' + id + ' > i.abmuted').addClass('d-none').hide();
+	if (setup === true || setup === "true")
+		$('#rp' + id + ' > i.absetup').addClass('d-none').hide();
+	else
+		$('#rp' + id + ' > i.absetup').removeClass('d-none').show();
 }
 
 /**
