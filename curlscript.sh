@@ -30,9 +30,11 @@ echo "${PLUGIN}"
 STREAM_PLUGIN_ID=$(echo $PLUGIN | awk '{print $11}')
 
 # Now create the mountpoint:
-MOUNTPOINT_CREATE="$(curl --header "Content-Type: application/json" --request POST --data '{"janus": "message", "transaction": "123abc", "body": {"request": "create", "is_private": true, "id": 4545, "type": "rtp", "audio": false, "video": true, "videoport": 8004, "videopt": 126, "videortpmap": "H264/90000", "videofmtp": "profile-level-id=42e01f"}}' https://$IP:$PORT/janus/$SESSION_ID/$STREAM_PLUGIN_ID -k --insecure)"
+MOUNTPOINT_CREATE="$(curl --header "Content-Type: application/json" --request POST --data '{"janus": "message", "transaction": "123abc", "body": {"request": "create", "is_private": true, "id": 4545, "type": "rtp", "audio": true, "audiopt": 10, "audioport": 8005, "audiortpmap":"opus/48000/2", "video": true, "videoport": 8004, "videopt": 96, "videortpmap": "H264/90000", "videofmtp": "profile-level-id=42e028;packetization-mode=1"}}' https://$IP:$PORT/janus/$SESSION_ID/$STREAM_PLUGIN_ID -k --insecure)"
 echo "${MOUNTPOINT_CREATE}"
 
 # And finish off by having the pi start the stream:
 # raspivid --verbose --nopreview --width 640 --height 480 --framerate 15 --bitrate 1000000 --profile baseline --timeout 0 -o - | gst-launch-1.0 -v fdsrc !  h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=$IP port=8004
-raspivid -n -w 1280 -h 720 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| ffmpeg -y -i - -c:v copy -map 0:0 -f rtp rtp://"${IP}":8004
+# raspivid -n -w 1280 -h 720 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| ffmpeg -y -i - -c:v copy -map 0:0 -f rtp rtp://"${IP}":8004
+raspivid -n -w 640 -h 480 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| gst-launch-1.0 -v fdsrc ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host="${IP}" port=8004 alsasrc device=plughw:1,0 ! audioconvert ! audioresample ! opusenc ! rtpopuspay ! udpsink host="${IP}" port=8005
+# raspivid --verbose --nopreview -hf -vf --width 640 --height 480 --framerate 15 --bitrate 1000000 --profile baseline --timeout 0 -o - | gst-launch-1.0 -v fdsrc ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host="${IP}" port=8004 alsasrc device=plughw:1,0 ! audioconvert ! audioresample ! opusenc ! rtpopuspay ! udpsink host="${IP}" port=8005

@@ -278,12 +278,15 @@ URL: `https://localhost:8089/janus/sessionEndpointInteger/streamingPluginHandleE
         "is_private": true,
         "id": ID,
         "type": "rtp",
-        "audio": false,
+        "audio": true,
+        "audioport": 8005,
+        "audiopt": 10,
+        "audiortpmap":"opus/48000/2",
         "video": true,
         "videoport": 8004,
-        "videopt": 126,
+        "videopt": 96,
         "videortpmap": "H264/90000",
-        "videofmtp": "profile-level-id=42e01f"
+        "videofmtp": "profile-level-id=42e028;packetization-mode=1"
     }
 }
 ```
