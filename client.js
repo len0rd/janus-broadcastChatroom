@@ -147,7 +147,8 @@ $(document).ready(function() {
 										"request": "rtp_forward",
 										"room": room,
 										"host": streamOrigin,
-										"port": 8007};
+										"port": 5000,
+										"ptype": 100};
 									audioHandle.send({"message": forwardAudio});
 								} else {
 									Janus.debug(" ==> Room forwarding already exists");
