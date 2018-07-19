@@ -18,6 +18,8 @@ Create a broadcast chat room using Janus and NodeJS.
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Linux Streaming Commands](#streaming-commands-wip)
 
+[Limitations](#limitations)
+
 # Dependencies
 
 To install and run this demo, you will need to satisfy the folowing dependencies:
@@ -312,3 +314,13 @@ rtsp stream:
 ```bash
 raspivid -n -w 1280 -h 720 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| ffmpeg -y -i - -c:v copy -map 0:0 -f rtsp rtsp://10.10.110.103:8554/myStream
 ```
+
+# Limitations
+
+### Gstreamer
+At present gstreamer 1.0 is used for 2-way voice and 1-way video on the linux device. This adds the convenience of using a well-maintained open source library as well as allowing modular input/output devices. However, the current commands use UDP *exclusively*. Janus' RTP forwarding feature uses UDP only, which limits gstreamer. This forwarding feature is used by Janus to send the audio of the current room back to the linux device. Janus developers have no intention to extend to TCP. This is because UDP allows Janus to simply dump the current stream regardless of if there's anything listening on the other end.
+
+Gstreamer itself appears to also introduce some limitations - droping samples at times even when running through a local network. There is likely much further optimization that can be done to the commands used on the linux device. FFMPEG is also likely a viable option, however for the purposes of this demo, functionality was priority.
+
+### Security
+At present this demo has zero regard for security. However Janus has many features integrated to enforce authentication, including stream encryption. Many of these options would ideally be setup by whatever device creates the room. For more information on authentication, check [this Janus page](https://janus.conf.meetecho.com/docs/auth.html).
