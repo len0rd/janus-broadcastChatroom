@@ -37,10 +37,9 @@ echo "${MOUNTPOINT_CREATE}"
 # raspivid -n -w 1280 -h 720 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| ffmpeg -y -i - -c:v copy -map 0:0 -f rtp rtp://"${IP}":8004
 raspivid -n -w 640 -h 480 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| gst-launch-1.0 -q -v fdsrc ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host="${IP}" port=8004 alsasrc device=plughw:1,0 ! audioconvert ! audioresample ! opusenc ! rtpopuspay ! udpsink host="${IP}" port=8005 &
 
-printf "\n\nSTARTED STREAM UP\n"
+printf "\n\nStarted stream up to Janus\n"
 
-# -q does quiet gst launch
 # setup the receiving sink:
 gst-launch-1.0 -q -m udpsrc port=5000 ! "application/x-rtp, media=(string)audio, encoding-name=(string)OPUS, payload=(int)100, rate=16000, channels=(int)1" ! rtpopusdepay ! opusdec !  audioconvert ! audiorate ! audioresample ! alsasink device=plughw:1,0 &
 
-printf "\n\nSTARTED STREAM DOWN\n"
+printf "\n\nStarted sink for Janus\n"
