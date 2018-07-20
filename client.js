@@ -47,286 +47,10 @@ $(document).ready(function() {
 			server: server,
 			success: function() {
 				// Attach to audiobridge plugin
-				janus.attach({
-					plugin: "janus.plugin.audiobridge",
-					opaqueId: opaqueId,
-					success: function(pluginHandle) {
-						audioHandle = pluginHandle;
-						Janus.log("Plugin attached! (" + audioHandle.getPlugin() + ", id=" + audioHandle.getId() + ")");
-						// Prepare the username registration
-						$('#videojoin').removeClass('d-none').show();
-						$('#register').click(registerUsername);
-						$('#username').focus();
-						$('#stop').click(function() {
-							$(this).attr('disabled', true);
-							janus.destroy();
-						});
-
-						//see if the audio rtp forwarder to the controller has been created:
-						var checkForwarders = {"request": "listforwarders", "room": room};
-						
-						audioHandle.send({"message": checkForwarders});
-					},
-					error: function(error) {
-						Janus.error("Error attaching audiobridge plugin...", error);
-						bootbox.alert("Error attaching plugin... " + error);
-					},
-					consentDialog: function(on) {
-						Janus.debug("Consent dialog should be " + (on ? "on" : "off") + " now");
-						if(on) {
-							// Darken screen and show hint
-							$.blockUI({ 
-								message: '<div></div>',
-								css: {
-									border: 'none',
-									padding: '15px',
-									backgroundColor: 'transparent',
-									color: '#aaa',
-									top: '10px',
-									left: (navigator.mozGetUserMedia ? '-100px' : '300px')
-								} });
-						} else {
-							// Restore screen
-							$.unblockUI();
-						}
-					},
-					onmessage: function(msg, jsep) {
-						Janus.debug(" ::: Got a message :::");
-						Janus.debug(msg);
-						var event = msg["audiobridge"];
-						Janus.debug("Event: " + event);
-						if (event != undefined && event != null) {
-							if (event === "joined") {
-								// A joined event is triggered every time a new participant joins
-								if(!webrtcUp) {
-									// Successfully joined, negotiate WebRTC now
-									Janus.log("Successfully joined room " + msg["room"] + " with ID " + myid);
-									myid = msg["id"];
-									webrtcUp = true;
-									// Publish our stream
-									audioHandle.createOffer({
-										media: { video: false},	// This is an audio only room
-										success: function(jsep) {
-											Janus.debug("Got SDP!");
-											Janus.debug(jsep);
-											var publish = { "request": "configure", "muted": false };
-											audioHandle.send({"message": publish, "jsep": jsep});
-										},
-										error: function(error) {
-											Janus.error("WebRTC error:", error);
-											bootbox.alert("WebRTC error... " + JSON.stringify(error));
-										}
-									});
-								}
-
-								// if we have a streaming handle, connect to the default stream for the room;
-								if (streamingHandle !== null) {
-									connectRoomStream();
-								}
-
-								// Any room participant?
-								if (msg["participants"] !== undefined && msg["participants"] !== null) {
-									var list = msg["participants"];
-									updateParticipantList(list);
-								}
-							} else if (event === "destroyed") {
-								// The room has been destroyed
-								Janus.warn("The room has been destroyed!");
-								bootbox.alert("The room has been destroyed", function() {
-									window.location.reload();
-								});
-							} else if (event === "forwarders") {
-								var forwarderList = msg["rtp_forwarders"];
-								if (forwarderList === null || forwarderList === undefined ||
-									forwarderList.length === 0) {
-									Janus.debug(" ==> Setup room forwarding now");
-									// we haven't forwarded the audiobridge
-									// to the controller yet. Do that now
-									//TODO: make this a little less terrible
-									var forwardAudio = {
-										"request": "rtp_forward",
-										"room": room,
-										"host": streamOrigin,
-										"port": 5000,
-										"ptype": 100};
-									audioHandle.send({"message": forwardAudio});
-								} else {
-									Janus.debug(" ==> Room forwarding already exists");
-								}
-							} else if (event === "event") {
-								if (msg["participants"] !== undefined && msg["participants"] !== null) {
-									var list = msg["participants"];
-									updateParticipantList(list);
-
-								} else if (msg["error"] !== undefined && msg["error"] !== null) {
-									if (msg["error_code"] === 485) {
-										// This is a "no such room" error: give a more meaningful description
-										bootbox.alert("Room <code>" + room + "</code> does not exist");
-									} else {
-										bootbox.alert(msg["error"]);
-									}
-									return;
-								}
-								// Any new feed to attach to?
-								if (msg["leaving"] !== undefined && msg["leaving"] !== null) {
-									// One of the participants has gone away?
-									var leaving = msg["leaving"];
-									Janus.log("Participant left: " + leaving + " (we have " + $('#rp' + leaving).length + " elements with ID #rp" + leaving + ")");
-									$('#rp' + leaving).remove();
-								}
-							}
-						}
-
-						if (jsep !== undefined && jsep !== null) {
-							Janus.debug("Handling SDP as well...");
-							Janus.debug(jsep);
-							audioHandle.handleRemoteJsep({jsep: jsep});
-						}
-					},
-					onlocalstream: function(stream) {
-						//deals with properly attaching the local stream
-						//note that clients cannot hear themselves, only 
-						//the other people on the call
-						Janus.debug(" ::: Got local stream :::");
-						mystream = stream;
-						Janus.debug(stream);
-						//hide the login screen (where you pick a username)
-						$('#videojoin').hide();
-						//show all the video containers
-						$('#mediacontainer').removeClass('d-none').show();
-						$('#stop').removeClass('d-none').show();
-					},
-					onremotestream: function(stream) {
-						$('#mediacontainer').removeClass('d-none').show();
-						var addMute = false;
-						if ($('#mixedaudio').length === 0) {
-							addMute = true;
-							$('#audiocontainer0').append('<audio class="rounded centered" id="mixedaudio" width="100%" height="100%" autoplay/>');
-						}
-						Janus.attachMediaStream($('#mixedaudio').get(0), stream);
-
-						if (addMute) {
-							audioenabled = true;
-							updateSelf();
-
-							$('#mute').click(function() {
-								audioenabled = !audioenabled;
-								$('#mute').html(audioenabled ? "Mute" : "Unmute");
-								audioHandle.send({message: {"request": "configure", "muted": !audioenabled}});
-								updateSelf();
-							}).removeClass('d-none').show();
-						}
-					},
-					oncleanup: function() {
-						Janus.log(" ::: Got a cleanup notification :::");
-						webrtcUp = false;
-						$('#clientlist').empty();
-						$('#bitrate').parent().parent().addClass('d-none');
-						$('#bitrate a').unbind('click');
-					}
-				});
+				attachAudioBridge();
 
 				// Attach to streaming plugin
-				janus.attach({
-					plugin: "janus.plugin.streaming",
-					opaqueId: opaqueId,
-					success: function(pluginHandle) {
-						Janus.log("Steam plugin attached!");
-						streamingHandle = pluginHandle;
-						
-					},
-					error: function(error) {
-						Janus.error(" ==> ERROR attaching streaming plugin", error);
-						bootbox.alert("Error streaming video: " + error);
-					},
-					onmessage: function(msg, jsep) {
-						Janus.debug(" ==> Streaming Handle got a message");
-						Janus.debug(msg);
-						var result = msg["result"];
-						if (result !== null && result !== undefined) {
-							// you can get a bunch of info about status here.
-							// see the streamingtest example for details
-						} else if (msg["error"] !== null && msg["error"] !== undefined) {
-							bootbox.alert(msg["error"]);
-							Janus.log(" ==> Streaming got error message: ", msg);
-							return;
-						}
-
-						if(jsep !== undefined && jsep !== null) {
-							Janus.debug("Handling SDP as well...");
-							Janus.debug(jsep);
-							// Offer from the plugin, let's answer
-							streamingHandle.createAnswer({
-								jsep: jsep,
-								media: { audioSend: false, videoSend: false },	// We want recvonly audio/video
-								success: function(jsep) {
-									Janus.debug("Got SDP!");
-									Janus.debug(jsep);
-									var body = { "request": "start" };
-									streamingHandle.send({"message": body, "jsep": jsep});
-									$('#remotevideo0').html("Stop").removeAttr('disabled').click(stopStream);
-								},
-								error: function(error) {
-									Janus.error("WebRTC error:", error);
-									bootbox.alert("WebRTC error... " + JSON.stringify(error));
-								}
-							});
-						}
-					},
-					onremotestream: function(stream) {
-						// We got the non-webrtc remote stream!
-						if ($('#remotevideo0').length === 0) {
-							//if the video tag hasn't been made yet, create it
-							$('#videocontainer0').append('<video class="rounded centered relative d-none" id="remotevideo0" width="100%" height="100%" autoplay/>');
-							// and the little badge for bitrate
-							$('#videocontainer0').append(
-								'<span class="badge badge-pill badge-secondary d-none" id="curbitrate0" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;"></span>');
-						}
-
-						Janus.attachMediaStream($('#remotevideo0').get(0), stream);
-						var videoTracks = stream.getVideoTracks();
-						if (videoTracks === null || videoTracks === undefined || videoTracks.length === 0) {
-							// No remote video
-							//if this is the host stream and it has no video
-							//display a nice little icon indicating this
-							$('#remotevideo0').hide();
-							if($('#videocontainer0' + ' .no-video-container').length === 0) {
-								$('#videocontainer0').append(
-									'<div class="no-video-container">' +
-										'<i class="fa fa-video-camera fa-5 no-video-icon"></i>' +
-										'<span class="no-video-text">No remote video available</span>' +
-									'</div>');
-							}
-						} else {
-							//we got a video track:
-							$('#videocontainer0 .no-video-container').remove();
-							$('#remotevideo0').removeClass('d-none').show();
-						}
-
-						//bitrate time junk:
-						if (videoTracks && videoTracks.length && (
-							Janus.webRTCAdapter.browserDetails.browser === "chrome" 
-							|| Janus.webRTCAdapter.browserDetails.browser === "firefox" 
-							|| Janus.webRTCAdapter.browserDetails.browser === "safari")) {
-							
-								$('#curbitrate0').removeClass('d-none').show();
-								bitrateTimer[0] = setInterval(function() {
-								// Display updated bitrate, if supported
-								var bitrate = streamingHandle.getBitrate();
-								$('#curbitrate0').text(bitrate);
-							}, 1000);
-						}
-						
-					},
-					oncleanup: function() {
-						Janus.log("cleanup notification for remote streaming video");
-						
-						$('#remotevideo0').remove();
-						if (bitrateTimer[0] !== null && bitrateTimer[0] !== undefined) {
-							clearInterval(bitrateTimer[0]);
-						}
-					}
-				});
+				attachStreaming();
 			},
 			error: function(error) {
 				Janus.error(error);
@@ -340,6 +64,290 @@ $(document).ready(function() {
 		});
 	}});
 });
+
+function attachAudioBridge() {
+	janus.attach({
+		plugin: "janus.plugin.audiobridge",
+		opaqueId: opaqueId,
+		success: function(pluginHandle) {
+			audioHandle = pluginHandle;
+			Janus.log("Plugin attached! (" + audioHandle.getPlugin() + ", id=" + audioHandle.getId() + ")");
+			// Prepare the username registration
+			$('#videojoin').removeClass('d-none').show();
+			$('#register').click(registerUsername);
+			$('#username').focus();
+			$('#stop').click(function() {
+				$(this).attr('disabled', true);
+				janus.destroy();
+			});
+
+			//see if the audio rtp forwarder to the controller has been created:
+			var checkForwarders = {"request": "listforwarders", "room": room};
+			
+			audioHandle.send({"message": checkForwarders});
+		},
+		error: function(error) {
+			Janus.error("Error attaching audiobridge plugin...", error);
+			bootbox.alert("Error attaching plugin... " + error);
+		},
+		consentDialog: function(on) {
+			Janus.debug("Consent dialog should be " + (on ? "on" : "off") + " now");
+			if(on) {
+				// Darken screen and show hint
+				$.blockUI({ 
+					message: '<div></div>',
+					css: {
+						border: 'none',
+						padding: '15px',
+						backgroundColor: 'transparent',
+						color: '#aaa',
+						top: '10px',
+						left: (navigator.mozGetUserMedia ? '-100px' : '300px')
+					} });
+			} else {
+				// Restore screen
+				$.unblockUI();
+			}
+		},
+		onmessage: function(msg, jsep) {
+			Janus.debug(" ::: Got a message :::");
+			Janus.debug(msg);
+			var event = msg["audiobridge"];
+			Janus.debug("Event: " + event);
+			if (event != undefined && event != null) {
+				if (event === "joined") {
+					// A joined event is triggered every time a new participant joins
+					if(!webrtcUp) {
+						// Successfully joined, negotiate WebRTC now
+						Janus.log("Successfully joined room " + msg["room"] + " with ID " + myid);
+						myid = msg["id"];
+						webrtcUp = true;
+						// Publish our stream
+						audioHandle.createOffer({
+							media: { video: false},	// This is an audio only room
+							success: function(jsep) {
+								Janus.debug("Got SDP!");
+								Janus.debug(jsep);
+								var publish = { "request": "configure", "muted": false };
+								audioHandle.send({"message": publish, "jsep": jsep});
+							},
+							error: function(error) {
+								Janus.error("WebRTC error:", error);
+								bootbox.alert("WebRTC error... " + JSON.stringify(error));
+							}
+						});
+					}
+
+					// if we have a streaming handle, connect to the default stream for the room;
+					if (streamingHandle !== null) {
+						connectRoomStream();
+					}
+
+					// Any room participant?
+					if (msg["participants"] !== undefined && msg["participants"] !== null) {
+						var list = msg["participants"];
+						updateParticipantList(list);
+					}
+				} else if (event === "destroyed") {
+					// The room has been destroyed
+					Janus.warn("The room has been destroyed!");
+					bootbox.alert("The room has been destroyed", function() {
+						window.location.reload();
+					});
+				} else if (event === "forwarders") {
+					var forwarderList = msg["rtp_forwarders"];
+					if (forwarderList === null || forwarderList === undefined ||
+						forwarderList.length === 0) {
+						Janus.debug(" ==> Setup room forwarding now");
+						// we haven't forwarded the audiobridge
+						// to the controller yet. Do that now
+						//TODO: make this a little less terrible
+						var forwardAudio = {
+							"request": "rtp_forward",
+							"room": room,
+							"host": streamOrigin,
+							"port": 5000,
+							"ptype": 100};
+						audioHandle.send({"message": forwardAudio});
+					} else {
+						Janus.debug(" ==> Room forwarding already exists");
+					}
+				} else if (event === "event") {
+					if (msg["participants"] !== undefined && msg["participants"] !== null) {
+						var list = msg["participants"];
+						updateParticipantList(list);
+
+					} else if (msg["error"] !== undefined && msg["error"] !== null) {
+						if (msg["error_code"] === 485) {
+							// This is a "no such room" error: give a more meaningful description
+							bootbox.alert("Room <code>" + room + "</code> does not exist");
+						} else {
+							bootbox.alert(msg["error"]);
+						}
+						return;
+					}
+					// Any new feed to attach to?
+					if (msg["leaving"] !== undefined && msg["leaving"] !== null) {
+						// One of the participants has gone away?
+						var leaving = msg["leaving"];
+						Janus.log("Participant left: " + leaving + " (we have " + $('#rp' + leaving).length + " elements with ID #rp" + leaving + ")");
+						$('#rp' + leaving).remove();
+					}
+				}
+			}
+
+			if (jsep !== undefined && jsep !== null) {
+				Janus.debug("Handling SDP as well...");
+				Janus.debug(jsep);
+				audioHandle.handleRemoteJsep({jsep: jsep});
+			}
+		},
+		onlocalstream: function(stream) {
+			//deals with properly attaching the local stream
+			//note that clients cannot hear themselves, only 
+			//the other people on the call
+			Janus.debug(" ::: Got local stream :::");
+			mystream = stream;
+			Janus.debug(stream);
+			//hide the login screen (where you pick a username)
+			$('#videojoin').hide();
+			//show all the video containers
+			$('#mediacontainer').removeClass('d-none').show();
+			$('#stop').removeClass('d-none').show();
+		},
+		onremotestream: function(stream) {
+			$('#mediacontainer').removeClass('d-none').show();
+			var addMute = false;
+			if ($('#mixedaudio').length === 0) {
+				addMute = true;
+				$('#audiocontainer0').append('<audio class="rounded centered" id="mixedaudio" width="100%" height="100%" autoplay/>');
+			}
+			Janus.attachMediaStream($('#mixedaudio').get(0), stream);
+
+			if (addMute) {
+				audioenabled = true;
+				updateSelf();
+
+				$('#mute').click(function() {
+					audioenabled = !audioenabled;
+					$('#mute').html(audioenabled ? "Mute" : "Unmute");
+					audioHandle.send({message: {"request": "configure", "muted": !audioenabled}});
+					updateSelf();
+				}).removeClass('d-none').show();
+			}
+		},
+		oncleanup: function() {
+			Janus.log(" ::: Got a cleanup notification :::");
+			webrtcUp = false;
+			$('#clientlist').empty();
+			$('#bitrate').parent().parent().addClass('d-none');
+			$('#bitrate a').unbind('click');
+		}
+	});
+}
+
+function attachStreaming() {
+	janus.attach({
+		plugin: "janus.plugin.streaming",
+		opaqueId: opaqueId,
+		success: function(pluginHandle) {
+			Janus.log("Steam plugin attached!");
+			streamingHandle = pluginHandle;
+			
+		},
+		error: function(error) {
+			Janus.error(" ==> ERROR attaching streaming plugin", error);
+			bootbox.alert("Error streaming video: " + error);
+		},
+		onmessage: function(msg, jsep) {
+			Janus.debug(" ==> Streaming Handle got a message");
+			Janus.debug(msg);
+			var result = msg["result"];
+			if (result !== null && result !== undefined) {
+				// you can get a bunch of info about status here.
+				// see the streamingtest example for details
+			} else if (msg["error"] !== null && msg["error"] !== undefined) {
+				bootbox.alert(msg["error"]);
+				Janus.log(" ==> Streaming got error message: ", msg);
+				return;
+			}
+
+			if(jsep !== undefined && jsep !== null) {
+				Janus.debug("Handling SDP as well...");
+				Janus.debug(jsep);
+				// Offer from the plugin, let's answer
+				streamingHandle.createAnswer({
+					jsep: jsep,
+					media: { audioSend: false, videoSend: false },	// We want recvonly audio/video
+					success: function(jsep) {
+						Janus.debug("Got SDP!");
+						Janus.debug(jsep);
+						var body = { "request": "start" };
+						streamingHandle.send({"message": body, "jsep": jsep});
+						$('#remotevideo0').html("Stop").removeAttr('disabled').click(stopStream);
+					},
+					error: function(error) {
+						Janus.error("WebRTC error:", error);
+						bootbox.alert("WebRTC error... " + JSON.stringify(error));
+					}
+				});
+			}
+		},
+		onremotestream: function(stream) {
+			// We got the non-webrtc remote stream!
+			if ($('#remotevideo0').length === 0) {
+				//if the video tag hasn't been made yet, create it
+				$('#videocontainer0').append('<video class="rounded centered relative d-none" id="remotevideo0" width="100%" height="100%" autoplay/>');
+				// and the little badge for bitrate
+				$('#videocontainer0').append(
+					'<span class="badge badge-pill badge-secondary d-none" id="curbitrate0" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;"></span>');
+			}
+
+			Janus.attachMediaStream($('#remotevideo0').get(0), stream);
+			var videoTracks = stream.getVideoTracks();
+			if (videoTracks === null || videoTracks === undefined || videoTracks.length === 0) {
+				// No remote video
+				//if this is the host stream and it has no video
+				//display a nice little icon indicating this
+				$('#remotevideo0').hide();
+				if($('#videocontainer0' + ' .no-video-container').length === 0) {
+					$('#videocontainer0').append(
+						'<div class="no-video-container">' +
+							'<i class="fa fa-video-camera fa-5 no-video-icon"></i>' +
+							'<span class="no-video-text">No remote video available</span>' +
+						'</div>');
+				}
+			} else {
+				//we got a video track:
+				$('#videocontainer0 .no-video-container').remove();
+				$('#remotevideo0').removeClass('d-none').show();
+			}
+
+			//bitrate time junk:
+			if (videoTracks && videoTracks.length && (
+				Janus.webRTCAdapter.browserDetails.browser === "chrome" 
+				|| Janus.webRTCAdapter.browserDetails.browser === "firefox" 
+				|| Janus.webRTCAdapter.browserDetails.browser === "safari")) {
+				
+					$('#curbitrate0').removeClass('d-none').show();
+					bitrateTimer[0] = setInterval(function() {
+					// Display updated bitrate, if supported
+					var bitrate = streamingHandle.getBitrate();
+					$('#curbitrate0').text(bitrate);
+				}, 1000);
+			}
+			
+		},
+		oncleanup: function() {
+			Janus.log("cleanup notification for remote streaming video");
+			
+			$('#remotevideo0').remove();
+			if (bitrateTimer[0] !== null && bitrateTimer[0] !== undefined) {
+				clearInterval(bitrateTimer[0]);
+			}
+		}
+	});
+}
 
 function updateParticipantList(list) {
 	// add self first
