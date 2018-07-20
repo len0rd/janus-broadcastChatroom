@@ -42,7 +42,12 @@ MOUNTPOINT_CREATE="$(curl --header "Content-Type: application/json" --request PO
 echo "${MOUNTPOINT_CREATE}"
 
 # And finish off by having the pi start the stream:
-# raspivid --verbose --nopreview --width 640 --height 480 --framerate 15 --bitrate 1000000 --profile baseline --timeout 0 -o - | gst-launch-1.0 -v fdsrc !  h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host=$IP port=8004
 # raspivid -n -w 1280 -h 720 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| ffmpeg -y -i - -c:v copy -map 0:0 -f rtp rtp://"${IP}":8004
-raspivid -n -w 640 -h 480 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| gst-launch-1.0 -v fdsrc ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host="${IP}" port=8004 alsasrc device=plughw:1,0 ! audioconvert ! audioresample ! opusenc ! rtpopuspay ! udpsink host="${IP}" port=8005
-# raspivid --verbose --nopreview -hf -vf --width 640 --height 480 --framerate 15 --bitrate 1000000 --profile baseline --timeout 0 -o - | gst-launch-1.0 -v fdsrc ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host="${IP}" port=8004 alsasrc device=plughw:1,0 ! audioconvert ! audioresample ! opusenc ! rtpopuspay ! udpsink host="${IP}" port=8005
+raspivid -n -w 640 -h 480 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| gst-launch-1.0 -q -v fdsrc ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host="${IP}" port=8004 alsasrc device=plughw:1,0 ! audioconvert ! audioresample ! opusenc ! rtpopuspay ! udpsink host="${IP}" port=8005 &
+
+printf "\n\nStarted stream up to Janus\n"
+
+# setup the receiving sink:
+gst-launch-1.0 -q -m udpsrc port=5000 ! "application/x-rtp, media=(string)audio, encoding-name=(string)OPUS, payload=(int)100, rate=16000, channels=(int)1" ! rtpopusdepay ! opusdec !  audioconvert ! audiorate ! audioresample ! alsasink device=plughw:1,0 &
+
+printf "\n\nStarted sink for Janus\n"

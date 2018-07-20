@@ -278,7 +278,7 @@ URL: `https://localhost:8089/janus/sessionEndpointInteger/streamingPluginHandleE
     "body": {
         "request": "create",
         "is_private": true,
-        "id": ID,
+        "id": roomID,
         "type": "rtp",
         "audio": true,
         "audioport": 8005,
@@ -307,6 +307,40 @@ If you aren't actively sending POST requests, you need to send a long-poll reque
 
 URL: `https://localhost:8089/janus/sessionEndpointInteger?maxev=1`
 
+6. Ping to see if the room is alive
+
+You can also ping Janus to see if the room you're intending to broadcast to is still up:
+
+```json
+{
+    "janus": "message", 
+    "transaction": "123abc", 
+    "body": {
+        "request" : "exists", 
+        "room" : roomID
+    }
+}
+```
+
+This will return something like this:
+```json
+{
+   "janus": "success",
+   "session_id": sessionEndpointInteger,
+   "transaction": "123abc",
+   "sender": pluginEndpointInteger,
+   "plugindata": {
+      "plugin": "janus.plugin.audiobridge",
+      "data": {
+         "audiobridge": "success",
+         "room": roomID,
+         "exists": false
+      }
+   }
+}
+```
+
+With `exists` changing depending on whether or not the room is still present.
 
 ## Streaming Commands-WIP
 
