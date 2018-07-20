@@ -1,6 +1,6 @@
 Create a broadcast chat room using Janus and NodeJS.
 
-[setup](docs/setupDiagram.png)
+![setup](docs/setupDiagram.png)
 
 ## Table of Contents
 
