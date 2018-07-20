@@ -1,5 +1,7 @@
 Create a broadcast chat room using Janus and NodeJS.
 
+[setup](docs/setupDiagram.png)
+
 ## Table of Contents
 
 [Dependencies](#dependencies)
@@ -352,7 +354,7 @@ raspivid -n -w 1280 -h 720 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| ff
 # Limitations
 
 ### Gstreamer
-At present gstreamer 1.0 is used for 2-way voice and 1-way video on the linux device. This adds the convenience of using a well-maintained open source library as well as allowing modular input/output devices. However, the current commands use UDP *exclusively*. Janus' RTP forwarding feature uses UDP only, which limits gstreamer. This forwarding feature is used by Janus to send the audio of the current room back to the linux device. Janus developers have no intention to extend to TCP. This is because UDP allows Janus to simply dump the current stream regardless of if there's anything listening on the other end.
+At present gstreamer 1.0 is used for 2-way voice a`exists`nd 1-way video on the linux device. This adds the convenience of using a well-maintained open source library as well as allowing modular input/output devices. However, the current commands use UDP *exclusively*. Janus' RTP forwarding feature uses UDP only, which limits gstreamer. This forwarding feature is used by Janus to send the audio of the current room back to the linux device. Janus developers have no intention to extend to TCP. This is because UDP allows Janus to simply dump the current stream regardless of if there's anything listening on the other end.
 
 Gstreamer itself appears to also introduce some limitations - droping samples at times even when running through a local network. There is likely much further optimization that can be done to the commands used on the linux device. FFMPEG is also likely a viable option, however for the purposes of this demo, functionality was priority.
 
