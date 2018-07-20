@@ -1,4 +1,6 @@
-Create a broadcast chat room using Janus and NodeJS.
+# Alarmnet Live
+
+Broadcast chatroom using [Janus](https://janus.conf.meetecho.com/docs/) and [NodeJS](https://nodejs.org/en/)
 
 ![setup](docs/setupDiagram.png)
 
@@ -280,7 +282,7 @@ URL: `https://localhost:8089/janus/sessionEndpointInteger/streamingPluginHandleE
     "body": {
         "request": "create",
         "is_private": true,
-        "id": roomID,
+        "id": anID-We Use the roomID,
         "type": "rtp",
         "audio": true,
         "audioport": 8005,
@@ -344,12 +346,52 @@ This will return something like this:
 
 With `exists` changing depending on whether or not the room is still present.
 
-## Streaming Commands-WIP
+## Streaming Commands
 
-rtsp stream:
+### Finding your audio device
+In the following commands you'll see `device=plughw:1,0` used. This is the name of the audio device we're using. `cat /proc/asound/cards` can be used to see how the audio devices are numbered. Assuming your kernel uses ALSA, you can also use ALSA tools to see detailed info: `aplay --list-devices`. The audio device we use in the above examples was 'card 1' and only had 1 subdevice, thus `device=plughw:1,0`
+
+### On a Raspberry Pi
+
+- Send video to Janus using FFMPEG:
 ```bash
-raspivid -n -w 1280 -h 720 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| ffmpeg -y -i - -c:v copy -map 0:0 -f rtsp rtsp://10.10.110.103:8554/myStream
+raspivid -n -w 1280 -h 720 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| ffmpeg -y -i - -c:v copy -map 0:0 -f rtp rtp://"${JANUS_IP}":8004
 ```
+
+- Send audio/video to Janus using GStreamer and [Rpicamsrc](https://github.com/thaytan/gst-rpicamsrc)
+```bash
+gst-launch-1.0 rpicamsrc ! video/x-raw,width=640,height=480 ! x264enc speed-preset=ultrafast tune=zerolatency byte-stream=true bitrate=200 threads=1 ! h264parse config-interval=1 ! rtph264pay pt=96 ! udpsink host="${JANUS_IP}" port=8004 alsasrc device=plughw:1,0 ! audioconvert ! audioresample ! opusenc ! rtpopuspay ! udpsink host="${JANUS_IP}" port=8005
+```
+
+- Send audio/video to Janus using Gstreamer and raspivid pipe:
+```bash
+raspivid -n -w 640 -h 480 -fps 25 -g 25 -vf -t 86400000 -b 2500000 -ih -o -| gst-launch-1.0 -v fdsrc ! h264parse ! rtph264pay config-interval=1 pt=96 ! udpsink host="${JANUS_IP}" port=8004 alsasrc device=plughw:1,0 ! audioconvert ! audioresample ! opusenc ! rtpopuspay ! udpsink host="${JANUS_IP}" port=8005
+```
+
+### Get Forwarded Audio From Janus
+
+This demo uses the RTP forwarding feature built into Janus's [AudioBridge](https://janus.conf.meetecho.com/docs/audiobridge.html) plugin to send audio back to a linux device. To forward the audio back to linux, you can simply make a request to Janus from your audiobridge endpoint:
+
+```json
+{
+    "janus": "message",
+    "transaction": "123abc",
+    "body": {
+        "request": "rtp_forward",
+        "room": roomID,
+        "host": linuxDeviceIP,
+        "port": 5000
+    }
+}
+```
+
+On the linux device you can use GStreamer to make a UDP source to receive the stream:
+
+```bash
+gst-launch-1.0 -m udpsrc port=5000 ! "application/x-rtp, media=(string)audio, encoding-name=(string)OPUS, payload=(int)100, rate=16000, channels=(int)1" ! rtpopusdepay ! opusdec !  audioconvert ! audiorate ! audioresample ! alsasink device=plughw:1,0
+```
+
+Note that Janus *only* has support for UDP. This is explained more in the [limitations](#limitations) section
 
 # Limitations
 
@@ -359,4 +401,4 @@ At present gstreamer 1.0 is used for 2-way voice a`exists`nd 1-way video on the 
 Gstreamer itself appears to also introduce some limitations - droping samples at times even when running through a local network. There is likely much further optimization that can be done to the commands used on the linux device. FFMPEG is also likely a viable option, however for the purposes of this demo, functionality was priority.
 
 ### Security
-At present this demo has zero regard for security. However Janus has many features integrated to enforce authentication, including stream encryption. Many of these options would ideally be setup by whatever device creates the room. For more information on authentication, check [this Janus page](https://janus.conf.meetecho.com/docs/auth.html).
+At present this demo has zero regard for security. However Janus has many features integrated to enforce security/authentication, including stream encryption. Many of these options would ideally be setup by whatever device creates the room. For more information on authentication, check [this Janus page](https://janus.conf.meetecho.com/docs/auth.html).
