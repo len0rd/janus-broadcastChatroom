@@ -48,7 +48,6 @@ $(document).ready(function() {
 			success: function() {
 				// Attach to audiobridge plugin
 				attachAudioBridge();
-
 				// Attach to streaming plugin
 				attachStreaming();
 			},
@@ -80,11 +79,6 @@ function attachAudioBridge() {
 				$(this).attr('disabled', true);
 				janus.destroy();
 			});
-
-			//see if the audio rtp forwarder to the controller has been created:
-			var checkForwarders = {"request": "listforwarders", "room": room};
-			
-			audioHandle.send({"message": checkForwarders});
 		},
 		error: function(error) {
 			Janus.error("Error attaching audiobridge plugin...", error);
@@ -117,23 +111,37 @@ function attachAudioBridge() {
 			if (event != undefined && event != null) {
 				if (event === "joined") {
 					// A joined event is triggered every time a new participant joins
-					if(!webrtcUp) {
+					if (!webrtcUp) {
+						//hide the login screen (where you pick a username)
+						$('#videojoin').hide();
+						//show all the video containers
+						$('#mediacontainer').removeClass('d-none').show();
+						$('#stop').removeClass('d-none').show();
+
 						// Successfully joined, negotiate WebRTC now
-						Janus.log("Successfully joined room " + msg["room"] + " with ID " + myid);
+						Janus.log("Successfully joined room " + msg["room"] + " with ID " + msg["id"]);
 						myid = msg["id"];
 						webrtcUp = true;
 						// Publish our stream
 						audioHandle.createOffer({
-							media: { video: false},	// This is an audio only room
+							media: { video: false, audioSend: true, audioRecv: true},	// This is an audio only room
 							success: function(jsep) {
-								Janus.debug("Got SDP!");
+								Janus.debug("Got SDP! JSEP::");
 								Janus.debug(jsep);
-								var publish = { "request": "configure", "muted": false };
+								var publish = { "request": "configure", "muted": false};
 								audioHandle.send({"message": publish, "jsep": jsep});
 							},
 							error: function(error) {
 								Janus.error("WebRTC error:", error);
-								bootbox.alert("WebRTC error... " + JSON.stringify(error));
+
+								if (error["name"] !== null && error["name"] !== undefined && error["name"] === "NotAllowedError") {
+									// in this case we only got an error because the user denied mic permissions. we should
+									// still show them the room. Configure ourselves as muted
+									var publish = { "request": "configure", "muted": true};
+									audioHandle.send({"message": publish});
+								} else {
+									bootbox.alert("WebRTC error... " + JSON.stringify(error));
+								}
 							}
 						});
 					}
@@ -154,29 +162,10 @@ function attachAudioBridge() {
 					bootbox.alert("The room has been destroyed", function() {
 						window.location.reload();
 					});
-				} else if (event === "forwarders") {
-					var forwarderList = msg["rtp_forwarders"];
-					if (forwarderList === null || forwarderList === undefined ||
-						forwarderList.length === 0) {
-						Janus.debug(" ==> Setup room forwarding now");
-						// we haven't forwarded the audiobridge
-						// to the controller yet. Do that now
-						//TODO: make this a little less terrible
-						var forwardAudio = {
-							"request": "rtp_forward",
-							"room": room,
-							"host": streamOrigin,
-							"port": 5000,
-							"ptype": 100};
-						audioHandle.send({"message": forwardAudio});
-					} else {
-						Janus.debug(" ==> Room forwarding already exists");
-					}
 				} else if (event === "event") {
 					if (msg["participants"] !== undefined && msg["participants"] !== null) {
 						var list = msg["participants"];
 						updateParticipantList(list);
-
 					} else if (msg["error"] !== undefined && msg["error"] !== null) {
 						if (msg["error_code"] === 485) {
 							// This is a "no such room" error: give a more meaningful description
@@ -203,28 +192,15 @@ function attachAudioBridge() {
 			}
 		},
 		onlocalstream: function(stream) {
-			//deals with properly attaching the local stream
-			//note that clients cannot hear themselves, only 
-			//the other people on the call
+			// deals with properly attaching the local stream
+			// note that clients cannot hear themselves, only 
+			// the other people on the call
 			Janus.debug(" ::: Got local stream :::");
 			mystream = stream;
 			Janus.debug(stream);
-			//hide the login screen (where you pick a username)
-			$('#videojoin').hide();
-			//show all the video containers
-			$('#mediacontainer').removeClass('d-none').show();
-			$('#stop').removeClass('d-none').show();
-		},
-		onremotestream: function(stream) {
-			$('#mediacontainer').removeClass('d-none').show();
-			var addMute = false;
-			if ($('#mixedaudio').length === 0) {
-				addMute = true;
-				$('#audiocontainer0').append('<audio class="rounded centered" id="mixedaudio" width="100%" height="100%" autoplay/>');
-			}
-			Janus.attachMediaStream($('#mixedaudio').get(0), stream);
 
-			if (addMute) {
+			// if we have a local stream, then add a mute button for that stream
+			if ($('#mixedaudio').length === 0) {
 				audioenabled = true;
 				updateSelf();
 
@@ -235,6 +211,13 @@ function attachAudioBridge() {
 					updateSelf();
 				}).removeClass('d-none').show();
 			}
+		},
+		onremotestream: function(stream) {
+			$('#mediacontainer').removeClass('d-none').show();
+			if ($('#mixedaudio').length === 0) {
+				$('#audiocontainer0').append('<audio class="rounded centered" id="mixedaudio" width="100%" height="100%" autoplay/>');
+			}
+			Janus.attachMediaStream($('#mixedaudio').get(0), stream);
 		},
 		oncleanup: function() {
 			Janus.log(" ::: Got a cleanup notification :::");
@@ -284,7 +267,6 @@ function attachStreaming() {
 						Janus.debug(jsep);
 						var body = { "request": "start" };
 						streamingHandle.send({"message": body, "jsep": jsep});
-						$('#remotevideo0').html("Stop").removeAttr('disabled').click(stopStream);
 					},
 					error: function(error) {
 						Janus.error("WebRTC error:", error);
@@ -330,7 +312,7 @@ function attachStreaming() {
 				|| Janus.webRTCAdapter.browserDetails.browser === "safari")) {
 				
 					$('#curbitrate0').removeClass('d-none').show();
-					bitrateTimer[0] = setInterval(function() {
+					bitrateTimer = setInterval(function() {
 					// Display updated bitrate, if supported
 					var bitrate = streamingHandle.getBitrate();
 					$('#curbitrate0').text(bitrate);

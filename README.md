@@ -20,7 +20,7 @@ Broadcast chatroom using [Janus](https://janus.conf.meetecho.com/docs/) and [Nod
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Communicate with Janus](#communicate-with-janus)
 
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Linux Streaming Commands](#streaming-commands-wip)
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Linux Streaming Commands](#streaming-commands)
 
 [Limitations](#limitations)
 

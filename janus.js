@@ -1237,12 +1237,6 @@ function Janus(gatewayCallbacks) {
 					Janus.log("Synchronous transaction successful (" + plugindata["plugin"] + ")");
 					var data = plugindata["data"];
 					Janus.debug(data);
-					//TODO: Tyler, this is jank af
-					if (data["audiobridge"] === "forwarders") {
-						json["janus"] = "event";
-						handleEvent(json, true);
-						return;
-					}
 					callbacks.success(data);
 					return;
 				} else if(json["janus"] !== "ack") {
