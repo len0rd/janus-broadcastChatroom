@@ -5,21 +5,26 @@
 
 var server = "https://" + window.location.hostname + ":8089/janus";
 
+//get the room number from the 'r' parameter in the url
 const room   = Number(getQueryStringValue("r"));
+//our different handlers
 var janus = null;
 var audioHandle = null;
 var streamingHandle = null;
+//this is useful purely for debugging. it allows us to assign an identical id to 
+//both plugins we attach to. With some modification (same id for machine), it could
+//also help track a certain user
 var opaqueId = "anlive-" + Janus.randomString(12);
 
-var myusername = null;
-var myid;
-var mystream = null;
-// We use this other ID just to map our subscriptions to us
-//var mypvtid = null;
-var webrtcUp = false;
-var audioenabled = false;
-var bitrateTimer;
+// basic user values
+var myusername = null; //entered by user
+var myid; //returned by janus on successful room join
 
+var webrtcUp = false; //ensures we only setup the room page once
+var audioenabled = false; //keep track of whether user is muted or has even approved microphone
+var bitrateTimer; // subscriber for little bitrate pill in bottom-right of video 
+
+// if the user disconnects, properly leave the room 
 window.onbeforeunload = function() {
 	if (audioHandle !== null) {
 		// try and at least fire off a leave before the page reloads
@@ -30,15 +35,13 @@ window.onbeforeunload = function() {
 $(document).ready(function() {
 	// Initialize the library (all console debuggers enabled)
 	Janus.init({debug: "all", callback: function(){
-		// Use a button to start the demo
-		//$('#stop').one('click', function() {
 		$(this).attr('disabled', true).unbind('click');
 		// Make sure the browser supports WebRTC
 		if(!Janus.isWebrtcSupported()) {
 			bootbox.alert("No WebRTC support... ");
 			return;
 		}
-		// Create session
+		// Create session with janus
 		janus = new Janus({
 			server: server,
 			success: function() {
@@ -48,9 +51,10 @@ $(document).ready(function() {
 				attachStreaming();
 			},
 			error: function(error) {
+				//we cant go any further if we're unable to connect to the Janus server
 				Janus.error(error);
 				bootbox.alert(error, function() {
-					window.location.reload();
+					window.location.reload(); //tell the user about our problems
 				});
 			},
 			destroyed: function() {
@@ -60,16 +64,26 @@ $(document).ready(function() {
 	}});
 });
 
+/**
+ * Called when we successfully attach a Janus session to the server.
+ * This will attach to the audio bridge plugin. this plugin handles 
+ * mixing and publishing the audio of all the WebRTC participants in 
+ * a room (as a single stream!). Audio bridge is also used to forward 
+ * a UDP RTP stream of its audio to the linux device. However this 
+ * forwarding is setup by the linux controller script in this example.
+ * @see controller.sh
+ */
 function attachAudioBridge() {
 	janus.attach({
 		plugin: "janus.plugin.audiobridge",
 		opaqueId: opaqueId,
 		success: function(pluginHandle) {
+			//we've successfully attached to the audio plugin
 			audioHandle = pluginHandle;
 			Janus.log("Plugin attached! (" + audioHandle.getPlugin() + ", id=" + audioHandle.getId() + ")");
-			// Prepare the username registration
+			// prepare for user registration by showing the required elements
 			$('#videojoin').removeClass('d-none').show();
-			$('#register').click(registerUsername);
+			$('#register').click(registerUsername); 
 			$('#username').focus();
 			$('#stop').click(function() {
 				$(this).attr('disabled', true);
@@ -77,13 +91,16 @@ function attachAudioBridge() {
 			});
 		},
 		error: function(error) {
+			// if we faile to attach the audio bridge, we're in trouble
 			Janus.error("Error attaching audiobridge plugin...", error);
 			bootbox.alert("Error attaching plugin... " + error);
 		},
 		consentDialog: function(on) {
+			// Janus triggers this callback whenever there's a change
+			// in the consent dialog (the box in browser that asks for the mic)
 			Janus.debug("Consent dialog should be " + (on ? "on" : "off") + " now");
 			if(on) {
-				// Darken screen and show hint
+				// Darken screen until the user deals with the dialog
 				$.blockUI({ 
 					message: '<div></div>',
 					css: {
@@ -100,17 +117,21 @@ function attachAudioBridge() {
 			}
 		},
 		onmessage: function(msg, jsep) {
+			// triggered when the Janus server sends us async data
 			Janus.debug(" ::: Got a message :::");
 			Janus.debug(msg);
 			var event = msg["audiobridge"];
 			Janus.debug("Event: " + event);
+			//just double check this msg is meant for us
 			if (event != undefined && event != null) {
 				if (event === "joined") {
 					// A joined event is triggered every time a new participant joins
+					// including ourselves
+					// see if we've already started the room/webrtc page here
 					if (!webrtcUp) {
-						//hide the login screen (where you pick a username)
+						//hide the login elements (where you pick a username)
 						$('#videojoin').hide();
-						//show all the video containers
+						//show all containers for video and participants
 						$('#mediacontainer').removeClass('d-none').show();
 						$('#stop').removeClass('d-none').show();
 
@@ -129,7 +150,9 @@ function attachAudioBridge() {
 							},
 							error: function(error) {
 								Janus.error("WebRTC error:", error);
-
+								// TODO: need to handle when user disallows mic. They should still be able
+								// to hear and see everything. Below is a start, but not functional. 'NotAllowedError'
+								// is returned when the user rejects mic priveledge (i think).
 								if (error["name"] !== null && error["name"] !== undefined && error["name"] === "NotAllowedError") {
 									// in this case we only got an error because the user denied mic permissions. we should
 									// still show them the room. Configure ourselves as muted
@@ -149,20 +172,23 @@ function attachAudioBridge() {
 
 					// Any room participant?
 					if (msg["participants"] !== undefined && msg["participants"] !== null) {
+						//if there are, lets update the sidebar with the list of participants
 						var list = msg["participants"];
 						updateParticipantList(list);
 					}
 				} else if (event === "destroyed") {
-					// The room has been destroyed
+					// The room has been destroyed/closed
 					Janus.warn("The room has been destroyed!");
-					bootbox.alert("The room has been destroyed", function() {
+					bootbox.alert("The room has been closed", function() {
 						window.location.reload();
 					});
 				} else if (event === "event") {
 					if (msg["participants"] !== undefined && msg["participants"] !== null) {
+						//if the message is a participants list, lets update ours!
 						var list = msg["participants"];
 						updateParticipantList(list);
 					} else if (msg["error"] !== undefined && msg["error"] !== null) {
+						//just push the error up to the user (for now)
 						if (msg["error_code"] === 485) {
 							// This is a "no such room" error: give a more meaningful description
 							bootbox.alert("Room <code>" + room + "</code> does not exist");
@@ -181,6 +207,9 @@ function attachAudioBridge() {
 				}
 			}
 
+			// SDP is apart of WebRTC that describes the session
+			// and helps configure the overall conneciton. We dont
+			// need to worry about the gritty details here b/c Janus
 			if (jsep !== undefined && jsep !== null) {
 				Janus.debug("Handling SDP as well...");
 				Janus.debug(jsep);
@@ -188,18 +217,19 @@ function attachAudioBridge() {
 			}
 		},
 		onlocalstream: function(stream) {
-			// deals with properly attaching the local stream
+			// we dont need to do much here
 			// note that clients cannot hear themselves, only 
 			// the other people on the call
 			Janus.debug(" ::: Got local stream :::");
-			mystream = stream;
 			Janus.debug(stream);
 
-			// if we have a local stream, then add a mute button for that stream
+			// if we have a local stream, then add a mute button
+			// (so if the user reject mic permission, the mute button _shouldnt_ show up)
 			if ($('#mixedaudio').length === 0) {
 				audioenabled = true;
 				updateSelf();
 
+				//callback for the mute button
 				$('#mute').click(function() {
 					audioenabled = !audioenabled;
 					$('#mute').html(audioenabled ? "Mute" : "Unmute");
@@ -209,18 +239,22 @@ function attachAudioBridge() {
 			}
 		},
 		onremotestream: function(stream) {
-			$('#mediacontainer').removeClass('d-none').show();
+			// this is triggered when we receive the remote audio bridge stream from Janus
+			$('#mediacontainer').removeClass('d-none').show(); //maybe this triggers before a join? show this just-in-case
+			// if we haven't already made the audio object for the audio bridge, do it now
 			if ($('#mixedaudio').length === 0) {
 				$('#audiocontainer0').append('<audio class="rounded centered" id="mixedaudio" width="100%" height="100%" autoplay/>');
 			}
+			//attach the remote audio stream to our audio element
 			Janus.attachMediaStream($('#mixedaudio').get(0), stream);
 		},
 		oncleanup: function() {
 			Janus.log(" ::: Got a cleanup notification :::");
+			//clear out stuff
 			webrtcUp = false;
 			$('#clientlist').empty();
 			$('#bitrate').parent().parent().addClass('d-none');
-			$('#bitrate a').unbind('click');
+			$('#bitrate a').unbind('click');//not sure this is necessary
 		}
 	});
 }
@@ -320,8 +354,8 @@ function attachStreaming() {
 			Janus.log("cleanup notification for remote streaming video");
 			
 			$('#remotevideo0').remove();
-			if (bitrateTimer[0] !== null && bitrateTimer[0] !== undefined) {
-				clearInterval(bitrateTimer[0]);
+			if (bitrateTimer !== null && bitrateTimer !== undefined) {
+				clearInterval(bitrateTimer);
 			}
 		}
 	});
