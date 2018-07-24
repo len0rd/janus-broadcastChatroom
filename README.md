@@ -402,3 +402,21 @@ Gstreamer itself appears to also introduce some limitations - droping samples at
 
 ### Security
 At present this demo has zero regard for security. However Janus has many features integrated to enforce security/authentication, including stream encryption. Many of these options would ideally be setup by whatever device creates the room. For more information on authentication, check [this Janus page](https://janus.conf.meetecho.com/docs/auth.html).
+
+# Feature List
+
+The following is a list of features still awaiting implementation
+
+| Feature | % Implemented |
+|---------|---------------|
+| Record host broadcast	| 0 |
+| --entire room recording | 0 |
+| Host stream RTP -> SRTP | 0 |
+| Room timeout | 0 |
+| External STUN & TURN server | 50 |
+| Room authentication | 0 |
+| Room closure of host broadcast (Pi) | 0 |
+| Room chat: participant data (messaging) channel? | 0 |
+| URL generation and publishing | 50 |
+| Recovery mechanism | 0 |
+| avatar selection? | 0 |
