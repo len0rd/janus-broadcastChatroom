@@ -50,8 +50,12 @@ echo "${MOUNTPOINT_CREATE}"
 # Setup the RTP forward of the AudioBridge from Janus -> Controller
 # first get this machine's ip
 echo "Setup our listener to receive audio from Janus"
+
+printf "\n\nStart gst listener"
+exec ./janus-sink.sh &
+
 LOCAL_IP="$(hostname -I)"
-RTP_FORWARD_RESULT="$(curl --header "Content-Type: application/json" --request POST --data '{"janus": "message", "transaction": "123abc", "body": {"request": "rtp_forward", "room": '"${ROOM}"', "host": '"${LOCAL_IP}"', "port": 5000, "ptype": 100}}' https://$IP:$PORT/janus/$SESSION_ID/$AUDIO_PLUGIN_ID -k --insecure)"
+RTP_FORWARD_RESULT="$(curl --header "Content-Type: application/json" --request POST --data '{"janus": "message", "transaction": "1234asdf", "body": {"request": "rtp_forward", "room": '"${ROOM}"', "host": "10.10.110.74", "port": 5000, "ptype": 100}}' https://$IP:$PORT/janus/$SESSION_ID/$AUDIO_PLUGIN_ID -k --insecure)"
 echo "${RTP_FORWARD_RESULT}"
 
 # And finish off by having the pi start the stream:
