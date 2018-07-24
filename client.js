@@ -66,7 +66,7 @@ $(document).ready(function() {
 
 /**
  * Called when we successfully attach a Janus session to the server.
- * This will attach to the audio bridge plugin. this plugin handles 
+ * This will attach to the audio bridge plugin. This plugin handles 
  * mixing and publishing the audio of all the WebRTC participants in 
  * a room (as a single stream!). Audio bridge is also used to forward 
  * a UDP RTP stream of its audio to the linux device. However this 
@@ -258,28 +258,39 @@ function attachAudioBridge() {
 		}
 	});
 }
-
+/**
+ * Called after successfully attaching a Janus session to the server
+ * and after attaching to audiobridge plugin. This plugin directs the 
+ * audio and video stream from WebRTC participants to a video conference
+ * room.
+ */
 function attachStreaming() {
 	janus.attach({
 		plugin: "janus.plugin.streaming",
 		opaqueId: opaqueId,
 		success: function(pluginHandle) {
+			//successfully attached streaming plugin
 			Janus.log("Steam plugin attached!");
+			//streamingHandle and pluginHandle are same session ID
 			streamingHandle = pluginHandle;
 			
 		},
 		error: function(error) {
+			//error in attaching stream will result in no video/audio
 			Janus.error(" ==> ERROR attaching streaming plugin", error);
 			bootbox.alert("Error streaming video: " + error);
 		},
 		onmessage: function(msg, jsep) {
+			//Janus sending us data
 			Janus.debug(" ==> Streaming Handle got a message");
 			Janus.debug(msg);
 			var result = msg["result"];
+			//verifying data is meant for us
 			if (result !== null && result !== undefined) {
 				// you can get a bunch of info about status here.
 				// see the streamingtest example for details
 			} else if (msg["error"] !== null && msg["error"] !== undefined) {
+				//bad things happened
 				bootbox.alert(msg["error"]);
 				Janus.log(" ==> Streaming got error message: ", msg);
 				return;
@@ -293,12 +304,14 @@ function attachStreaming() {
 					jsep: jsep,
 					media: { audioSend: false, videoSend: false },	// We want recvonly audio/video
 					success: function(jsep) {
+						//successful answer, start streaming!
 						Janus.debug("Got SDP!");
 						Janus.debug(jsep);
 						var body = { "request": "start" };
 						streamingHandle.send({"message": body, "jsep": jsep});
 					},
 					error: function(error) {
+						//oops no successful answer
 						Janus.error("WebRTC error:", error);
 						bootbox.alert("WebRTC error... " + JSON.stringify(error));
 					}
@@ -351,8 +364,8 @@ function attachStreaming() {
 			
 		},
 		oncleanup: function() {
+			//remove stream
 			Janus.log("cleanup notification for remote streaming video");
-			
 			$('#remotevideo0').remove();
 			if (bitrateTimer !== null && bitrateTimer !== undefined) {
 				clearInterval(bitrateTimer);
@@ -361,6 +374,9 @@ function attachStreaming() {
 	});
 }
 
+/**
+ * Displays WebRTC participants as they join the video conference room
+ */
 function updateParticipantList(list) {
 	// add self first
 	updateSelf();
@@ -372,11 +388,14 @@ function updateParticipantList(list) {
 		var display = list[f]["display"];
 		var muted = list[f]["muted"];
 		var setup = list[f]["setup"];
-
+		//participant joins room
 		addParticipant(id, display, muted, setup);
 	}
 }
 
+/**
+ * Add self to participant list first
+ */
 function updateSelf(setup) {
 	if (myid !== null && myid !== undefined) {
 		var tempSetup = setup !== null && setup !== undefined ? setup : true;
@@ -387,6 +406,9 @@ function updateSelf(setup) {
 	}
 }
 
+/**
+ * Adds WebRTC participants to video conference room
+ */
 function addParticipant(id, display, muted, setup) {
 	Janus.debug("  >> [" + id + "] " + display + " (setup=" + setup + ", muted=" + muted + ")");
 	if ($('#rp' + id).length === 0) {
@@ -434,7 +456,9 @@ function checkEnter(field, event) {
 		return true;
 	}
 }
-
+/**
+ * Allows participants to enter own username before joining the video conference room
+ */
 function registerUsername() {
 	if ($('#username').length === 0) {
 		// Create fields to register
@@ -459,6 +483,7 @@ function registerUsername() {
 			$('#register').removeAttr('disabled').click(registerUsername);
 			return;
 		}
+		//request to join room with username
 		var register = {"request": "join", "room": room, "display": username};
 		myusername = username;
 		audioHandle.send({"message": register});
