@@ -3,17 +3,13 @@
 // co-located with the web server hosting the HTML pages but listening
 // on a different port (8089)
 
-//TODO: Eventually this code will be client/participant only -> will need
-//to weed most of the host code (clients will still need to recognize)
-//when a remote feed is 
 var server = "https://" + window.location.hostname + ":8089/janus";
-var streamOrigin = "10.10.110.74";
 
 const room   = Number(getQueryStringValue("r"));
 var janus = null;
 var audioHandle = null;
 var streamingHandle = null;
-var opaqueId = "demo-" + Janus.randomString(12);
+var opaqueId = "anlive-" + Janus.randomString(12);
 
 var myusername = null;
 var myid;
@@ -279,10 +275,10 @@ function attachStreaming() {
 			// We got the non-webrtc remote stream!
 			if ($('#remotevideo0').length === 0) {
 				//if the video tag hasn't been made yet, create it
-				$('#videocontainer0').append('<video class="rounded centered relative d-none" id="remotevideo0" width="100%" height="100%" autoplay/>');
+				$('#videocontainer0').append('<video class="rounded d-none" id="remotevideo0" width="100%"  autoplay/>');
 				// and the little badge for bitrate
 				$('#videocontainer0').append(
-					'<span class="badge badge-pill badge-secondary d-none" id="curbitrate0" style="position: absolute; bottom: 0px; right: 0px; margin: 15px;"></span>');
+					'<span class="badge badge-pill badge-secondary d-none bottom-right" id="curbitrate0" style="bottom: 0px;position: absolute; right: 0px; margin: 15px;"></span>');
 			}
 
 			Janus.attachMediaStream($('#remotevideo0').get(0), stream);
