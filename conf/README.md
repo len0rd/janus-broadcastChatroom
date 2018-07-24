@@ -28,19 +28,21 @@ sudo cp mycert.* /opt/janus/share/janus/certs
 
 ## Config file overview
 
-- janus.cfg
+### janus.cfg
 
 This file provides power top-level Janus server customization. Mainly addressing where things are located. The locations for other config files, certs, STUN/TURN servers and logs are all configured here.
 
-- janus.plugin.audiobridge.cfg
+### janus.plugin.audiobridge.cfg
 
-This file allows configuration of the audiobridge. With it you can create static audio rooms that always exist on the server. This isn't particularly useful for our us as we dynamically create and destroy rooms. Currently we have the test room `1234` set in this config file, for basic setup testing. In production you would want to remove this. It would also be beneficial to add an admin_key to this config file for authentication.
+This file allows configuration of the audiobridge plugin. With it you can create static audio rooms that always exist on the server. This isn't particularly useful for our us as we dynamically create and destroy rooms. Currently we have the test room `1234` setup in this config file for basic setup testing. In production you would want to remove this. It would also be beneficial to add the admin_key property for authentication.
 
-- janus.plugin.streaming.cfg
+### janus.plugin.streaming.cfg
 
 Similar to the audiobridge config, this allow the setup of static stream mountpoints. At the moment, this file is completely commented out, but again in production it would be good to add an admin_key.
 
-- janus.transport.http.cfg
+### janus.transport.http.cfg
 
-This config exposes options for how the REST http api works. This configures what port/path the api endpoint is on, whether to use http or https, and what certs to use for the api. This also configures if you are able to access the admin api. By default we have this turned off, but it can be helpful in debugging. Currently we also allow only https connections. We recommend keeping this since many features of WebRTC are only accessible over https, and it's easier to enforce it on the user from the get-go.
+This config exposes options for how the REST api works. This configures what port/path the api endpoint is on, whether to use http or https, and what certs to use for the api. This also configures if/how you are able to access the admin api. By default we have the admin api turned off, but it can be helpful in debugging. 
+
+Currently we only allow https connections. We recommend keeping this since many features of WebRTC are only accessible over https, and it's easier to enforce it on the user from the get-go.
 
