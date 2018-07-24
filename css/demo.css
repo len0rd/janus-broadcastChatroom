@@ -19,34 +19,8 @@
     margin-top: 2rem;
 }
 
-.margin-sm {
-	margin: 5px !important;
-}
-.margin-md {
-	margin: 10px !important;
-}
-.margin-xl {
-	margin: 20px !important;
-}
-.margin-bottom-sm {
-	margin-bottom: 5px !important;
-}
 .margin-bottom-md {
 	margin-bottom: 10px !important;
-}
-.margin-bottom-xl {
-	margin-bottom: 20px !important;
-}
-
-.divider {
-	width: 100%;
-	text-align: center;
-}
-
-.divider hr {
-	margin-left: auto;
-	margin-right: auto;
-	width: 45%;
 }
 
 div.no-video-container {
