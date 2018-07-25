@@ -10,7 +10,7 @@ if(window.location.protocol === 'http:')
 else
 	server = "https://" + window.location.hostname + ":7889/admin";
 // If you don't want the page to prompt you for a password, insert it here
-var secret = "";
+var secret = "janusoverlord";
 
 var session = null;		// Selected session
 var handle = null;		// Selected handle
