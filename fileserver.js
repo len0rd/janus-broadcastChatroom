@@ -1,5 +1,10 @@
 /**
  * Barebones https fileserver to use with Janus Gateway
+ * All we do here is tell node to statically serve the files
+ * from this directory
+ * 
+ * You can run this with: node fileserver.js 
+ * or: npm start
  */
 
 'use strict';

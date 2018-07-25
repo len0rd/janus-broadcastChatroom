@@ -24,6 +24,8 @@ Broadcast chatroom using [Janus](https://janus.conf.meetecho.com/docs/) and [Nod
 
 [Limitations](#limitations)
 
+[Feature List](#feature-list)
+
 # Dependencies
 
 To install and run this demo, you will need to satisfy the folowing dependencies:
@@ -410,13 +412,13 @@ The following is a list of features still awaiting implementation
 | Feature | % Implemented |
 |---------|---------------|
 | Record host broadcast	| 0 |
-| --entire room recording | 0 |
+| -- entire room recording | 0 |
 | Host stream RTP -> SRTP | 0 |
 | Room timeout | 0 |
 | External STUN & TURN server | 50 |
 | Room authentication | 0 |
-| Room closure of host broadcast (Pi) | 0 |
-| Room chat: participant data (messaging) channel? | 0 |
+| Room closure from linux device (Pi) | 0 |
+| Room chat: participant data channel? | 0 |
 | URL generation and publishing | 50 |
 | Recovery mechanism | 0 |
 | avatar selection? | 0 |
