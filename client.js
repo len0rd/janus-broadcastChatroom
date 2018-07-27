@@ -30,6 +30,9 @@ window.onbeforeunload = function() {
 		// try and at least fire off a leave before the page reloads
 		audioHandle.send({"message": {"request": "leave"}});
 	}
+	if (streamingHandle !== null) {
+		streamingHandle.send({"message": {"request": "stop"}});
+	}
 }
 
 $(document).ready(function() {
@@ -87,6 +90,13 @@ function attachAudioBridge() {
 			$('#username').focus();
 			$('#stop').click(function() {
 				$(this).attr('disabled', true);
+				if (audioHandle !== null) {
+					// try and at least fire off a leave before the page reloads
+					audioHandle.send({"message": {"request": "leave"}});
+				}
+				if (streamingHandle !== null) {
+					streamingHandle.send({"message": {"request": "stop"}});
+				}
 				janus.destroy();
 			});
 		},
@@ -439,7 +449,11 @@ function connectRoomStream() {
 	streamingHandle.send({"message": request});
 }
 
-// Helper to parse query string
+/**
+ * Helper method to try and extract GET paramenters from
+ * the url string
+ * @param {string} name Name of the GET parameter to try and extract
+ */
 function getQueryStringValue(name) {
 	name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
 	var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
@@ -447,6 +461,11 @@ function getQueryStringValue(name) {
 	return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
 }
 
+/**
+ * On the login screen, this function checks if the user presses the enter key.
+ * If they do, then it starts username registration (so that they dont have to 
+ * click the button)
+ */
 function checkEnter(field, event) {
 	var theCode = event.keyCode ? event.keyCode : event.which ? event.which : event.charCode;
 	if (theCode == 13) {
@@ -456,6 +475,7 @@ function checkEnter(field, event) {
 		return true;
 	}
 }
+
 /**
  * Allows participants to enter own username before joining the video conference room
  */
