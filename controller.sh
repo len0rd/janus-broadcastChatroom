@@ -36,7 +36,7 @@ STREAM_PLUGIN_ID=$(echo $PLUGIN | awk '{print $11}')
 echo "Send room id email"
 URL="https://$IP:$FILE_PORT?r=$ROOM"
 EMAIL="tylerm15@gmail.com jennawong16@gmail.com"
-#export $URL
+# send an email with a link to the room
 # echo "Save your boi's life: " $URL | mail -s "Videoroom URL" $EMAIL 
 echo "email sent!"
 
@@ -50,8 +50,7 @@ echo "${MOUNTPOINT_CREATE}"
 # Setup the RTP forward of the AudioBridge from Janus -> Controller
 # first get this machine's ip
 echo "Setup our listener to receive audio from Janus"
-
-printf "\n\nStart gst listener"
+printf "Start gst listener\n\n"
 exec ./janus-sink.sh &
 
 LOCAL_IP="$(hostname -I)"
