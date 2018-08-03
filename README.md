@@ -96,10 +96,22 @@ git clone https://github.com/meetecho/janus-gateway.git
 cd janus-gateway
 sh autogen.sh
 ./configure --prefix=/opt/janus --disable-all-plugins --disable-all-transports --enable-javascript-es-module --enable-plugin-audiobridge --enable-rest --disable-sample-event-handler --enable-plugin-streaming
-sudo su
 make
-make install
+sudo make install
 exit
+```
+
+**Side Note:** If you run into problems with the app working on the latest version of the Janus code, you can retry this installation process with the commit that we used:
+
+!!! Only execute this block if you have troubles running the app after executing the normal install block above
+```bash
+mkdir -p janus-old
+cd janus-old
+git init
+git remote add origin https://github.com/meetecho/janus-gateway.git
+git fetch --depth 1 origin 872c048a15feb15f1305a255ae2bf437748bca01
+git checkout FETCH_HEAD
+# now run the other commands in the above block (autogen, configure, make)
 ```
 
 5. install certs in the certs folder
