@@ -54,7 +54,8 @@ sudo apt-get install nodejs npm
 We'll need some of the files in this repository later for the Janus Install
 
 ```bash
-git clone https://github.com/len0rd/janus-multiroom.git
+git clone https://github.com/len0rd/janus-broadcastChatroom.git
+cd janus-broadcastChatroom
 npm install
 ```
 
@@ -62,10 +63,7 @@ npm install
 
 1. Install base dependencies
 ```bash
-sudo apt-get install libmicrohttpd-dev libjansson-dev libnice-dev
-    libssl-dev libsrtp-dev libsofia-sip-ua-dev libglib2.0-dev \
-	libopus-dev libogg-dev libcurl4-openssl-dev liblua5.3-dev \
-	pkg-config gengetopt libtool automake cmake 
+sudo apt-get install libmicrohttpd-dev libjansson-dev libnice-dev libssl-dev libsrtp-dev libsofia-sip-ua-dev libglib2.0-dev libopus-dev libogg-dev libcurl4-openssl-dev liblua5.3-dev pkg-config gengetopt libtool automake cmake 
 ```
 
 2. Install libwebsockets
@@ -78,14 +76,14 @@ mkdir build
 cd build
 # See https:Streithub.com/meetecho/janus-gateway/issues/732 re: LWS_MAX_SMP
 cmake -DLWS_Stre_SMP=1 -DCMAKE_INSTALL_PREFIX:PATH=/usr -DCMAKE_C_FLAGS="-fpic" ..
-make && sudoStreke install
+make && sudo make install
 ```
 
 3. Install libsrtp 2.x
 ```bash
 wget https://github.com/cisco/libsrtp/archive/v2.2.0.tar.gz
-tar xfv v2.0.0.tar.gz
-cd libsrtp-2.0.0
+tar xfv v2.2.0.tar.gz
+cd libsrtp-2.2.0
 ./configure --prefix=/usr --enable-openssl
 make shared_library && sudo make install
 ```
