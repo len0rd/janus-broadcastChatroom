@@ -14,6 +14,8 @@ Broadcast chatroom using [Janus](https://janus.conf.meetecho.com/docs/) and [Nod
 
 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Install Janus](#install-janus)
 
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[Setup Pi](#setup-pi)
+
 [Run the Demo](#run-the-demo)
 
 [Developers](#developers)
@@ -96,7 +98,6 @@ sh autogen.sh
 ./configure --prefix=/opt/janus --disable-all-plugins --disable-all-transports --enable-javascript-es-module --enable-plugin-audiobridge --enable-rest --disable-sample-event-handler --enable-plugin-streaming
 make
 sudo make install
-exit
 ```
 
 **Side Note:** If you run into problems with the app working on the latest version of the Janus code, you can retry this installation process with the commit that we used:
@@ -114,27 +115,57 @@ git checkout FETCH_HEAD
 
 5. install certs in the certs folder
 
-We have some default certs stored in this repository's `conf/` folder.
+- We have some default certs stored in this repository's `conf/` folder.
 ```bash
 sudo cp conf/mycert.* /opt/janus/share/janus/certs
 ```
-Or, generate your own self-signed certs:
+- Or, generate your own self-signed certs:
 ```bash
 openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout mycert.key -out mycert.pem
 ```
+
+And follow the prompts to generate a certificate. On the 'Common Name' setting, enter your local ip or network name. Once you've generated the new certs, use the same command as above to copy them to the Janus install:
+
+```bash
+sudo cp mycert.* /opt/janus/share/janus/certs
+```
+
 *Janus documentation recommends avoiding 512 bit certs for now*
 
 6. Install our config files for Janus
 
-These config files are in the `conf/` folder of this repository.
+These config files are in the `conf/` folder of this (janus-broadcastChatroom) repository.
+
 ```bash
+cd janus-broadcastChatroom
 sudo cp conf/*.cfg /opt/janus/etc/janus
 ```
 
-7. install in opt:
+## Setup Pi
+
+We use a raspberry pi as a sample linux device to stream video to the Janus server. Janus then relays this video out to everyone subscribed to a particular room. Janus also forwards audio from the room back to the pi. The pi opens a port and listens for this incoming traffic, relaying it onto the local audio device. All this is done by a set of two scripts. For more info on how we configure the streaming commands for the pi see [streaming on the pi](#on-a-raspberry-pi). 
+
+Before copying the script over to the Pi, make sure it's pointing to the newly installed Janus instance:
+
 ```bash
-make install
+# navigate to this repositories folder
+cd janus-broadcastChatroom 
+nano controller.sh
+# edit the IP variable in this script to the IP on which Janus is installed
+# when you have finished editing press 'ctrl + o' to save 
+# and 'ctrl + x' to exit
 ```
+
+Use `ip addr show` in linux to see what your current local IP address is. On the Alarmnet domain it should be `10.10.110.xxx`.
+
+With the script properly configured, copy the two script files in this repository over to the Pi.
+
+```bash
+# replace PI_LOCAL_IP_ADDRESS with the ip address of the Pi
+scp *.sh pi@PI_LOCAL_IP_ADDRESS:~/
+```
+
+With these files copied over, you're ready to run the demo!
 
 # Run the demo
 
@@ -142,14 +173,26 @@ With everything setup, you're ready to run the demo.
 
 Start Janus and the fileserver:
 ```bash
-./opt/janus/bin/janus
+cd /opt/janus/bin
+./janus
+# cd to this repository's (janus-broadcastChatroom) directory:
 cd this/repositorys/directory
 npm start
 ```
 
-In your browser, navigate to:
+In Firefox, navigate to:
 `https://localhost:8080?r=1234`
-This will take you to the default open room. If the page loads without any errors, everything worked!
+This will take you to the default open room. When you run the first time, you may also need to navigate to `https://localhost:8089` and add an exception for your certificate (This is the address of the Janus REST api). If the page loads without any major errors, everything worked! 
+
+Now lets get a bit more complicated and use the Pi to setup the room and start streaming:
+
+```bash
+ssh pi@PI_LOCAL_IP_ADDRESS
+# start the script:
+./controller.sh
+```
+
+This will create the room `4556` and have the Pi start streaming A/V to the room. You should be able to navigate to: `https://localhost:8080?r=4556` on your local machine and see the video!
 
 # Developers
 
