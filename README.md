@@ -1,4 +1,4 @@
-# Alarmnet Live
+# Broadcast Chatroom
 
 Broadcast chatroom using [Janus](https://janus.conf.meetecho.com/docs/) and [NodeJS](https://nodejs.org/en/)
 
